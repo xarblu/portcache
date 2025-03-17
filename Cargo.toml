@@ -1,0 +1,17 @@
+[package]
+name = "portcache"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+blake2 = "0.10.6"
+bytes = "1.10.1"
+clap = { version = "4.5.32", features = ["derive"] }
+futures = "0.3.31"
+futures-core = "0.3.31"
+hex = "0.4.3"
+reqwest = { version = "0.12.14", features = ["stream"] }
+rocket = "0.5.1"
+serde = { version = "1.0.219", features = ["derive"] }
+tokio = { version = "1.44.1", features = ["fs", "io-util"] }
+toml = "0.8.20"
