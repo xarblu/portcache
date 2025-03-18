@@ -6,8 +6,6 @@ mod config;
 mod fetcher;
 mod blob_storage;
 
-use crate::blob_storage::BlobStorage;
-
 /// Portage Distfile Cacher
 #[derive(Parser, Debug)]
 struct Args {
@@ -27,14 +25,7 @@ async fn main() {
             std::process::exit(1);
         });
 
-    let storage = BlobStorage::new(config.storage.clone())
-        .await
-        .unwrap_or_else(|e| {
-            eprintln!("Could not initialize blob storage: {}", e.to_string());
-            std::process::exit(1);
-        });
-
-    let _rocket = frontend::launch(config.clone(), storage.clone())
+    let _rocket = frontend::launch(&config)
         .await
         .unwrap_or_else(|e| {
             eprintln!("Failed to launch rocket: {}", e.to_string());

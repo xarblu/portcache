@@ -1,8 +1,14 @@
 [storage]
+
+# Storage location of the cache
 location = "/tmp/portcache"
 
 [fetcher]
+
+# Gentoo mirrors to use for fetching
+# Available mirrors: https://www.gentoo.org/downloads/mirrors/
+# Only supports http and https mirrors
 mirrors = [
-    "http://ftp.halifax.rwth-aachen.de/gentoo/",
     "https://ftp.halifax.rwth-aachen.de/gentoo/",
+    "http://ftp.halifax.rwth-aachen.de/gentoo/",
 ]

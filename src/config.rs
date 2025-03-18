@@ -23,6 +23,8 @@ pub struct FetcherConfig {
 }
 
 impl Config {
+    /// parse config file
+    /// @param config  optional path to config file
     pub fn parse(config: Option<String>) -> Result<Self, Box<dyn std::error::Error>> {
         let content = fs::read_to_string(config.unwrap_or(String::from("portcache.toml")))?;
         let config: Config = toml::from_str(&content)?;

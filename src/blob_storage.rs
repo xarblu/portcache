@@ -3,7 +3,7 @@ use futures_core::stream::Stream;
 use futures::stream::StreamExt;
 
 use crate::utils;
-use crate::fetcher;
+use crate::fetcher::Fetcher;
 use crate::config;
 
 /// storage for downloaded blobs
@@ -11,6 +11,9 @@ use crate::config;
 pub struct BlobStorage {
     /// root of the blob storage
     location: String,
+
+    /// Fetcher used for fetching missing files
+    fetcher: Fetcher,
 }
 
 impl BlobStorage {
@@ -21,10 +24,15 @@ impl BlobStorage {
         Ok(())
     }
 
-    /// create BlobStorage
+    /// create BlobStorage and setup fetcher for missing files
+    /// @param config    Config struct
     /// @param location  root of the blob storage
-    pub async fn new(config: config::BlobStorageConfig) -> Result<Self, Box<dyn std::error::Error>> {
-        let new = Self { location: config.location };
+    pub async fn new(config: &config::Config) -> Result<Self, Box<dyn std::error::Error>> {
+        let fetcher = Fetcher::new(&config).await?;
+        let new = Self {
+            location: config.storage.location.clone(),
+            fetcher,
+        };
 
         if !fs::try_exists(new.location.clone()).await? {
             println!("Initializing blob storage at {}", new.location.clone());
@@ -84,9 +92,13 @@ impl BlobStorage {
     /// get an AsyncReader to the requested file
     /// if the file isn't cached we will request the fetcher to fetch it
     /// TODO: verify request digest matches filename
-    /// TODO: this probably has race conditions
-    ///       when multiple threads request the same file
-    pub async fn request(&self, digest: String, file: String) -> Result<std::path::PathBuf, Box<dyn std::error::Error>> {
+    /// TODO: _should_ be thread safe since for now since BlobStorage
+    ///       is locked with a mutex from the rocket side
+    /// TODO: should probably split this to a try_request() which does a read only
+    ///       lookup in the cache and can serve without locking
+    /// @param digest  2 byte blake2b512 digest of the filename
+    /// @param file    file name
+    pub async fn request(&mut self, digest: String, file: String) -> Result<std::path::PathBuf, Box<dyn std::error::Error>> {
         // where we expect the file in storage
         let path = format!("{}/{}/{}",
                 self.location.clone(),
@@ -101,18 +113,11 @@ impl BlobStorage {
         }
         
         // then ask fetcher
-        self.fetch(file.clone()).await?;
+        self.fetcher.fetch(file.clone(), self.clone()).await?;
         if path.is_file() {
             return Ok(path.to_path_buf());
         }
 
         Err(format!("Could not obtain file {}", file.clone()).into())
-    }
-
-    /// fetch a file
-    /// TODO: make fetcher a struct and invoke this as a method
-    async fn fetch(&self, file: String) -> Result<(), Box<dyn std::error::Error>> {
-        fetcher::fetch_mirror("http://ftp.fau.de/gentoo".into(), file, self.clone()).await?;
-        Ok(())
     }
 }
