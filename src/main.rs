@@ -27,7 +27,7 @@ async fn main() {
             std::process::exit(1);
         });
 
-    let storage = BlobStorage::new(config.clone().blob_storage.location)
+    let storage = BlobStorage::new(config.storage.clone())
         .await
         .unwrap_or_else(|e| {
             eprintln!("Could not initialize blob storage: {}", e.to_string());

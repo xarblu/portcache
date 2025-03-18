@@ -1,2 +1,8 @@
-[blob_storage]
+[storage]
 location = "/tmp/portcache"
+
+[fetcher]
+mirrors = [
+    "http://ftp.halifax.rwth-aachen.de/gentoo/",
+    "https://ftp.halifax.rwth-aachen.de/gentoo/",
+]

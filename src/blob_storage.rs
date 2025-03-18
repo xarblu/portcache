@@ -4,6 +4,7 @@ use futures::stream::StreamExt;
 
 use crate::utils;
 use crate::fetcher;
+use crate::config;
 
 /// storage for downloaded blobs
 #[derive(Clone)]
@@ -22,8 +23,8 @@ impl BlobStorage {
 
     /// create BlobStorage
     /// @param location  root of the blob storage
-    pub async fn new(location: String) -> Result<Self, Box<dyn std::error::Error>> {
-        let new = Self{location};
+    pub async fn new(config: config::BlobStorageConfig) -> Result<Self, Box<dyn std::error::Error>> {
+        let new = Self { location: config.location };
 
         if !fs::try_exists(new.location.clone()).await? {
             println!("Initializing blob storage at {}", new.location.clone());

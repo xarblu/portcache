@@ -4,13 +4,22 @@ use std::fs;
 
 #[derive(Deserialize, Clone)]
 pub struct Config {
-    pub blob_storage: BlobStorageConfig,
+    pub storage: BlobStorageConfig,
+    pub fetcher: FetcherConfig,
 }
 
 #[derive(Deserialize, Clone)]
 pub struct BlobStorageConfig {
     /// where cached files are located
     pub location: String,
+}
+
+#[derive(Deserialize, Clone)]
+pub struct FetcherConfig {
+    /// List of mirror urls
+    /// Available mirrors: https://www.gentoo.org/downloads/mirrors/
+    /// Currently only supports HTTP and HTTPS
+    pub mirrors: Vec<String>,
 }
 
 impl Config {
