@@ -1,10 +1,8 @@
 [storage]
-
 # Storage location of the cache
-location = "/tmp/portcache"
+location = "/var/cache/portcache"
 
 [fetcher]
-
 # Gentoo mirrors to use for fetching
 # Available mirrors: https://www.gentoo.org/downloads/mirrors/
 # Only supports http and https mirrors
