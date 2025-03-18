@@ -16,7 +16,7 @@ or just want this "because it's cool" ^^
 - [x] AdHoc fetching from Gentoo mirrors
 - [ ] Look up and fetch from `SRC_URI`
 - [ ] Cache cleanup
-- [ ] Add Rust claims about how *blazingly fast* and *memory safe* it is
+- [ ] Add classic Rust claims about how *blazingly fast* and *memory safe* it is
 - [ ] Add obnoxious amount of obligatory Rust project emoji like: 🦀 🚀 💥
 
 ## Build / Install
