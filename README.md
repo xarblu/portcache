@@ -16,7 +16,8 @@ or just want this "because it's cool" ^^
 - [x] AdHoc fetching from Gentoo mirrors
 - [ ] Look up and fetch from `SRC_URI`
 - [ ] Cache cleanup
-- [ ] Add classic Rust claims about how *blazingly fast* and *memory safe* it is
+- [ ] Make the cache more async (e.g. fetch and serve in parallel, multiple clients served in parallel)
+- [ ] Add classic Rust project claims about how *blazingly fast* and *memory safe* it is
 - [ ] Add obnoxious amount of obligatory Rust project emoji like: 🦀 🚀 💥
 
 ## Build / Install
