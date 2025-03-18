@@ -11,6 +11,43 @@ or just want this "because it's cool" ^^
 - Load balancing across source mirrors
 - Fetch from `SRC_URI` directly if not mirrored
 
+## TODO
+
+- [x] AdHoc fetching from Gentoo mirrors
+- [ ] Look up and fetch from `SRC_URI`
+- [ ] Cache cleanup
+- [ ] Add Rust claims about how *blazingly fast* and *memory safe* it is
+- [ ] Add obnoxious amount of obligatory Rust project emoji like: 🦀 🚀 💥
+
+## Build / Install
+
+As said - this is not entirely ready yet - if you still want to test it you can compile it with `cargo`:
+
+```
+$ git clone https://github.com/xarblu/portcache.git
+```
+
+```
+$ cargo build --release
+```
+
+The resulting binary will be in `target/release/portcache`
+
+
+Alternatively snapshot versions will be available in my overlay `xarblu-overlay`:
+
+```
+# eselect repository enable xarblu-overlay
+```
+
+```
+# emerge --sync xarblu-overlay
+```
+
+```
+# emerge --ask app-portage/portcache
+```
+
 ## How?
 
 - Configure the `portcache` server as your mirror in `GENTOO_MIRRORS` in `make.conf` so `portage` will request files from `portcache`
