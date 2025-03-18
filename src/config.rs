@@ -1,11 +1,13 @@
 use toml;
 use serde::Deserialize;
 use std::fs;
+use std::net::IpAddr;
 
 #[derive(Deserialize, Clone)]
 pub struct Config {
     pub storage: BlobStorageConfig,
     pub fetcher: FetcherConfig,
+    pub server: ServerConfig,
 }
 
 #[derive(Deserialize, Clone)]
@@ -20,6 +22,15 @@ pub struct FetcherConfig {
     /// Available mirrors: https://www.gentoo.org/downloads/mirrors/
     /// Currently only supports HTTP and HTTPS
     pub mirrors: Vec<String>,
+}
+
+#[derive(Deserialize, Clone)]
+pub struct ServerConfig {
+    /// address rocket should listen on
+    pub address: IpAddr,
+
+    /// port to listen on
+    pub port: u16,
 }
 
 impl Config {

@@ -58,8 +58,15 @@ async fn distfiles(digest: &str, file: &str, shared: &State<SharedData>) -> Resu
 pub async fn launch(
     config: &Config,
     ) -> Result<Rocket<Ignite>, rocket::Error> {
+    let cfg = rocket::config::Config {
+        address: config.server.address.clone(),
+        port: config.server.port.clone(),
+        ..rocket::config::Config::default()
+    };
+
+
     let storage = BlobStorage::new(&config).await.expect("Failed to initialize blob storage");
-    rocket::build()
+    rocket::custom(cfg)
         .manage(SharedData { storage: Mutex::new(storage) })
         .mount("/", routes![layout_conf,distfiles])
         .launch()
