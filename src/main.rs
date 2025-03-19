@@ -11,6 +11,8 @@ mod config;
 mod fetcher;
 mod blob_storage;
 mod repo_syncer;
+mod manifest_walker;
+mod ebuild_parser;
 
 /// Portage Distfile Cacher
 #[derive(Parser, Debug)]
