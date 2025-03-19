@@ -14,7 +14,10 @@ or just want this "because it's cool" ^^
 ## TODO
 
 - [x] AdHoc fetching from Gentoo mirrors
-- [ ] Look up and fetch from `SRC_URI`
+- [ ] Look up and fetch from `SRC_URI`  
+      Look through all `Manifest` files in ebuild trees to find package wanting `file`.
+      Then `ebuild setup` and grab `temp/environment`, source in `bash`, echo `${SRC_URI}` and parse that for the url.
+      Potentially storing in `HashMap<Filename, URI>` for later reuse.
 - [ ] Cache cleanup
 - [ ] Make the cache more async (e.g. fetch and serve in parallel, multiple clients served in parallel)
 - [ ] Add classic Rust project claims about how *blazingly fast* and *memory safe* it is
