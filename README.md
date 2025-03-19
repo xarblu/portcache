@@ -17,7 +17,8 @@ or just want this "because it's cool" ^^
 - [ ] Look up and fetch from `SRC_URI`  
       Look through all `Manifest` files in ebuild trees to find package wanting `file`.
       Then `ebuild setup` and grab `temp/environment`, source in `bash`, echo `${SRC_URI}` and parse that for the url.
-      Potentially storing in `HashMap<Filename, URI>` for later reuse.
+      Potentially storing in `HashMap<Filename, URI>` for later reuse.  
+      (`ebuild $(equery which portcache) clean pretend && ( source /var/tmp/portage/app-portage/portcache-0.1.0/temp/environment && export SRC_URI && perl -e '$src_uri = $ENV{"SRC_URI"}; while ($src_uri =~ /\s*(?:\S+\?\s+\(\s+)*\s*(\S+)(?:\s+->\s+(\S+))?(?:\s+\))*\s*/g) { print "$1"; print " -> $2" if defined $2; print "\n"; }' )` for parsing the `ebuild` preprocessing `SRC_URI`)
 - [ ] Cache cleanup
 - [ ] Make the cache more async (e.g. fetch and serve in parallel, multiple clients served in parallel)
 - [ ] Add classic Rust project claims about how *blazingly fast* and *memory safe* it is
