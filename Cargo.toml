@@ -9,9 +9,11 @@ bytes = "1.10.1"
 clap = { version = "4.5.32", features = ["derive"] }
 futures = "0.3.31"
 futures-core = "0.3.31"
+git2 = "0.20.1"
 hex = "0.4.3"
 reqwest = { version = "0.12.14", features = ["stream"] }
 rocket = "0.5.1"
 serde = { version = "1.0.219", features = ["derive"] }
-tokio = { version = "1.44.1", features = ["fs", "io-util"] }
+tokio = { version = "1.44.1", features = ["fs", "io-util", "signal", "time"] }
+tokio-util = "0.7.14"
 toml = "0.8.20"

@@ -2,12 +2,14 @@ use toml;
 use serde::Deserialize;
 use std::fs;
 use std::net::IpAddr;
+use std::path::PathBuf;
 
 #[derive(Deserialize, Clone)]
 pub struct Config {
     pub storage: BlobStorageConfig,
     pub fetcher: FetcherConfig,
     pub server: ServerConfig,
+    pub repo: RepoConfig,
 }
 
 #[derive(Deserialize, Clone)]
@@ -31,6 +33,18 @@ pub struct ServerConfig {
 
     /// port to listen on
     pub port: u16,
+}
+
+#[derive(Deserialize, Clone)]
+pub struct RepoConfig {
+    /// interval in which to sync repos in minutes
+    pub sync_interval: u64,
+
+    /// path where the synced repos should be stored
+    pub storage_root: PathBuf,
+
+    /// list of repo urls to clone
+    pub repos: Vec<String>,
 }
 
 impl Config {

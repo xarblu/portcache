@@ -1,7 +1,8 @@
+use std::sync::Arc;
+
 use rocket::{get, State};
 use rocket::response::stream::ReaderStream;
 use rocket::routes;
-use rocket::{Rocket,Ignite};
 use rocket::tokio::fs::File;
 use rocket::http;
 use futures::lock::Mutex;
@@ -56,8 +57,8 @@ async fn distfiles(digest: &str, file: &str, shared: &State<SharedData>) -> Resu
 
 /// launch the frontend webserver
 pub async fn launch(
-    config: &Config,
-    ) -> Result<Rocket<Ignite>, rocket::Error> {
+    config: Arc<Config>,
+    ) -> Result<(), String> {
     let cfg = rocket::config::Config {
         address: config.server.address.clone(),
         port: config.server.port.clone(),
@@ -66,10 +67,12 @@ pub async fn launch(
 
 
     let storage = BlobStorage::new(&config).await.expect("Failed to initialize blob storage");
-    rocket::custom(cfg)
+    let _ = rocket::custom(cfg)
         .manage(SharedData { storage: Mutex::new(storage) })
         .mount("/", routes![layout_conf,distfiles])
         .launch()
-        .await
+        .await;
+
+    Ok(())
 }
 
