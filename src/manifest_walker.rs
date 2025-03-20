@@ -51,8 +51,6 @@ impl ManifestWalker {
                 Err(_) => continue
             };
 
-            println!("Checking {}", path.to_string_lossy());
-
             let mut lines = match fs::File::open(path.clone()).await {
                 Ok(file) => io::BufReader::new(file).lines(),
                 Err(_) => continue
