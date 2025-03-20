@@ -1,1 +1,5 @@
+# cargo build files
 /target
+
+# generated ebuilds from pycargoebuild
+*.ebuild
