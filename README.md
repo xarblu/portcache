@@ -18,6 +18,7 @@ or just want this "[because it's cool](https://youtu.be/NB8vk8Zrwak)"
       Look through all `Manifest` files in ebuild trees to find package wanting `file`.  
       Then use the Portage API (via `meta/src_uri_helper.py`) to get a JSON object containing `SRC_URI` data.
 - [ ] Cache cleanup
+- [ ] Better logging - configurable log levels, subsystem prefixes, ...
 - [ ] Make the cache more async (e.g. fetch and serve in parallel, multiple clients served in parallel)
 - [ ] Add classic Rust project claims about how *blazingly fast* and *memory safe* it is
 - [ ] Add obnoxious amount of obligatory Rust project emoji like: 🦀 🚀 💥
