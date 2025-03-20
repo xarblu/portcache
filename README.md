@@ -1,7 +1,7 @@
 # PORTage CACHE
 
 Cache server for portage distfiles - for those who maintain multiple Gentoo machines
-or just want this "because it's cool" ^^
+or just want this "[because it's cool](https://youtu.be/NB8vk8Zrwak)"
 
 **THIS IS VERY MUCH STILL A WORK IN PROGRESS**
 
@@ -13,12 +13,10 @@ or just want this "because it's cool" ^^
 
 ## TODO
 
-- [x] AdHoc fetching from Gentoo mirrors
-- [ ] Look up and fetch from `SRC_URI`  
-      Look through all `Manifest` files in ebuild trees to find package wanting `file`.
-      Then `ebuild setup` and grab `temp/environment`, source in `bash`, echo `${SRC_URI}` and parse that for the url.
-      Potentially storing in `HashMap<Filename, URI>` for later reuse.  
-      (`ebuild $(equery which portcache) clean pretend && ( source /var/tmp/portage/app-portage/portcache-0.1.0/temp/environment && export SRC_URI && perl -e '$src_uri = $ENV{"SRC_URI"}; while ($src_uri =~ /\s*(?:\S+\?\s+\(\s+)*\s*(\S+)(?:\s+->\s+(\S+))?(?:\s+\))*\s*/g) { print "$1"; print " -> $2" if defined $2; print "\n"; }' )` for parsing the `ebuild` preprocessing `SRC_URI`)
+- [x] AdHoc fetching from Gentoo mirrors - this simply forwards requests to a configured mirror.
+- [x] Look up and fetch from `SRC_URI`  
+      Look through all `Manifest` files in ebuild trees to find package wanting `file`.  
+      Then use the Portage API (via `meta/src_uri_helper.py`) to get a JSON object containing `SRC_URI` data.
 - [ ] Cache cleanup
 - [ ] Make the cache more async (e.g. fetch and serve in parallel, multiple clients served in parallel)
 - [ ] Add classic Rust project claims about how *blazingly fast* and *memory safe* it is
@@ -26,14 +24,19 @@ or just want this "because it's cool" ^^
 
 ## Build / Install
 
-As said - this is not entirely ready yet - if you still want to test it you can compile it with `cargo`:
+As said - this is not entirely ready yet - if you still want to test it you can compile it with `cargo`:  
+First clone the repo:  
 
 ```
 $ git clone https://github.com/xarblu/portcache.git
 ```
 
+Then compile the binary. The `PORTAGE_PYTHON` variable is optional but recommended to lock the Python
+interpreter used to interact with Portage to a version in `sys-apps/portage PYTHON_TARGETS`.
+If not set it will default to `python3` which may fail to `import portage`.
+
 ```
-$ cargo build --release
+$ PORTAGE_PYTHON="python3.13" cargo build --release
 ```
 
 The resulting binary will be in `target/release/portcache`
