@@ -6,10 +6,7 @@ location = "/var/cache/portcache/distfiles"
 # Gentoo mirrors to use for fetching
 # Available mirrors: https://www.gentoo.org/downloads/mirrors/
 # Only supports http and https mirrors
-mirrors = [
-    "https://ftp.halifax.rwth-aachen.de/gentoo/",
-    "http://ftp.halifax.rwth-aachen.de/gentoo/",
-]
+mirrors = []
 
 [server]
 # address the server should listen on
@@ -26,4 +23,7 @@ sync_interval = 5
 storage_root = "/var/cache/portcache/repos"
 
 # list of repo urls
-repos = ["https://github.com/xarblu/xarblu-overlay"]
+repos = [
+    "https://github.com/gentoo-mirror/gentoo",
+    "https://github.com/gentoo-mirror/xarblu-overlay"
+]

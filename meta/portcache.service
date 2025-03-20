@@ -3,6 +3,7 @@ Description=Portage Distfiles Cache
 After=network.target
 
 [Service]
+User=portcache
 ExecStart=/usr/bin/portcache -c /etc/portcache/portcache.toml
 
 # Hardening options
