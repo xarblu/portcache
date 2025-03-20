@@ -99,6 +99,7 @@ impl RepoSyncer {
             }
             
             let path = entry.unwrap().path();
+            println!("Syncing repo: {}", path.to_string_lossy());
             let repo = match Repository::open(&path) {
                 Ok(repo) => repo,
                 Err(e) => {
