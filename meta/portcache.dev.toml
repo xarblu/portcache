@@ -1,0 +1,29 @@
+[storage]
+# Storage location of the cache
+location = "/tmp/portcache/distfiles"
+
+[fetcher]
+# Gentoo mirrors to use for fetching
+# Available mirrors: https://www.gentoo.org/downloads/mirrors/
+# Only supports http and https mirrors
+mirrors = [
+    "https://ftp.halifax.rwth-aachen.de/gentoo/",
+    "http://ftp.halifax.rwth-aachen.de/gentoo/",
+]
+
+[server]
+# address the server should listen on
+address = "127.0.0.1"
+
+# port the server should listen on
+port = 8000
+
+[repo]
+# sync interval in minutes
+sync_interval = 5
+
+# directory where repos are stored
+storage_root = "/tmp/portcache/repos"
+
+# list of repo urls
+repos = ["https://github.com/xarblu/xarblu-overlay"]

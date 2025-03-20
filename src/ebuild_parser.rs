@@ -35,7 +35,7 @@ impl Ebuild {
 
         // let plain ebuild handle the setup
         let ebuild = Command::new("ebuild")
-            .args(&[path_str, "setup"])
+            .args(&[path_str, "clean", "setup"])
             .status()
             .await
             .expect("ebuild failed to run");

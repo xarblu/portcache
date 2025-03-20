@@ -39,10 +39,10 @@ impl ManifestWalker {
     pub async fn search(&self, pattern: String) -> Result<Option<PathBuf>, String> {
         // Manifests are always exactly at the 2nd level (category/package/Manifest)
         let manifests = WalkDir::new(self.root.as_os_str())
-            .min_depth(2)
-            .max_depth(2)
+            .min_depth(3)
+            .max_depth(3)
             .into_iter()
-            .filter_entry(|e| e.file_name().to_str() == Some("Manifest"));
+            .filter_entry(|e| e.file_name() == "Manifest");
 
         for manifest in manifests {
             // skip bad files
@@ -50,6 +50,8 @@ impl ManifestWalker {
                 Ok(manifest) => manifest.path().to_owned(),
                 Err(_) => continue
             };
+
+            println!("Checking {}", path.to_string_lossy());
 
             let mut lines = match fs::File::open(path.clone()).await {
                 Ok(file) => io::BufReader::new(file).lines(),
@@ -60,7 +62,8 @@ impl ManifestWalker {
                 Ok(line) => line, Err(_) => break 'parse_lines
             } {
                 if line.contains(&pattern) {
-                    return Ok(Some(PathBuf::from(path.clone())))
+                    println!("Found {} in {}", &pattern, path.to_string_lossy());
+                    return Ok(Some(PathBuf::from(&path)))
                 }
             }
         }
