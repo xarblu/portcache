@@ -154,14 +154,20 @@ impl Fetcher {
             return Err(format!("Could not find {} in any ebuild belonging to Manifest", &file).into());
         }
 
-        let full_url = src_uri.unwrap();
+        // try all urls
+        for url in src_uri.unwrap() {
+            println!("Fetching {}", url.clone());
 
-        println!("Fetching {}", full_url.clone());
-        let response = reqwest::get(full_url).await?;
-        response.error_for_status_ref()?;
+            let mut stream = match reqwest::get(url).await {
+                Err(e) => { eprintln!("{}", e); continue; },
+                Ok(response) => match response.error_for_status_ref() {
+                    Err(e) => { eprintln!("{}", e); continue; },
+                    Ok(_) => response.bytes_stream()
+                }
+            };
 
-        let mut stream = response.bytes_stream();
-        store.store(file.clone(), &mut stream).await?;
+            store.store(file.clone(), &mut stream).await?;
+        }
 
         Ok(())
     }

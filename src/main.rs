@@ -5,6 +5,10 @@ use repo_syncer::RepoSyncer;
 use tokio::signal::unix::SignalKind;
 use tokio_util::sync::CancellationToken;
 
+// import vars from build.rs
+include!(concat!(env!("OUT_DIR"), "/build_vars.rs"));
+
+// modules in this crate
 mod frontend;
 mod utils;
 mod config;
