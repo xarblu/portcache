@@ -147,6 +147,7 @@ impl Fetcher {
 
             if let Some(url) = parsed.src_uri().get(file) {
                 src_uri = Some(url.to_owned());
+                break;
             }
         }
         
