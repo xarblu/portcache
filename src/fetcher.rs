@@ -73,25 +73,42 @@ impl Fetcher {
         mirror
     }
 
-    /// utility method for fetching from a Gentoo mirror
+    /// utility method for fetching from Gentoo mirrors
+    /// will try all configured mirrors before failing
     ///
     /// @param file  Name of the distfile
     /// @param store BlobStorage use for storing the file
-    async fn fetch_mirror(&mut self, file: &String, store: &BlobStorage) -> Result<(), Box<dyn std::error::Error>> {
-        let mirror = self.select_mirror();
-        let full_url = match mirror.layout {
-            Layout::FileNameHashBlake2B => format!("{}/distfiles/{}/{}",
-                mirror.url.clone(), utils::filename_hash_dir_blake2b(file.clone()).unwrap(), file.clone()),
-        };
+    async fn fetch_mirror(&mut self, file: &String, store: &BlobStorage) -> Result<(), String> {
+        for _ in 0..self.mirrors.len() {
+            let mirror = self.select_mirror();
+            let full_url = match mirror.layout {
+                Layout::FileNameHashBlake2B => format!("{}/distfiles/{}/{}",
+                    mirror.url, utils::filename_hash_dir_blake2b(file.clone()).unwrap(), file),
+            };
 
-        println!("Fetching {}", full_url.clone());
-        let response = reqwest::get(full_url).await?;
-        response.error_for_status_ref()?;
+            println!("Fetching {}", &full_url);
+            // request error
+            let response = match reqwest::get(&full_url).await {
+                Ok(res) => res,
+                Err(e) => { eprintln!("GET {} failed: {}", &full_url, e.to_string()); continue; }
+            };
+            // response error
+            match response.error_for_status_ref() {
+                Ok(_) => (),
+                Err(e) => { eprintln!("GET {} failed: {}", &full_url, e.to_string()); continue; }
+            }
 
-        let mut stream = response.bytes_stream();
-        store.store(file.clone(), &mut stream).await?;
+            let mut stream = response.bytes_stream();
+            match store.store(file.clone(), &mut stream).await {
+                Ok(_) => (),
+                Err(e) => { eprintln!("GET {} failed: {}", &full_url, e.to_string()); continue; }
+            };
 
-        Ok(())
+            // only Ok when entire pipeline was success
+            return Ok(());
+        }
+
+        Err(format!("Couldn't fetch {} from any configured mirror", file))
     }
 
     /// utility method for fetching from SRC_URI
