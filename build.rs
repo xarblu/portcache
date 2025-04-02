@@ -23,5 +23,6 @@ fn main() {
     .unwrap();
     
     println!("cargo:rerun-if-changed=build.rs");
+    println!("cargo:rerun-if-changed=meta/src_uri_helper.py");
     println!("cargo:rerun-if-env-changed=PORTAGE_PYTHON");
 }
