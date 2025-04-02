@@ -87,18 +87,15 @@ impl Fetcher {
             };
 
             println!("Fetching {}", &full_url);
-            // request error
-            let response = match reqwest::get(&full_url).await {
-                Ok(res) => res,
-                Err(e) => { eprintln!("GET {} failed: {}", &full_url, e.to_string()); continue; }
-            };
-            // response error
-            match response.error_for_status_ref() {
-                Ok(_) => (),
-                Err(e) => { eprintln!("GET {} failed: {}", &full_url, e.to_string()); continue; }
-            }
 
-            let mut stream = response.bytes_stream();
+            let mut stream = match reqwest::get(&full_url).await {
+                Err(e) => { eprintln!("{}", e); continue; },
+                Ok(response) => match response.error_for_status_ref() {
+                    Err(e) => { eprintln!("{}", e); continue; },
+                    Ok(_) => response.bytes_stream()
+                }
+            };
+
             match store.store(file.clone(), &mut stream).await {
                 Ok(_) => (),
                 Err(e) => { eprintln!("GET {} failed: {}", &full_url, e.to_string()); continue; }
