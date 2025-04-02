@@ -16,9 +16,6 @@ enum Layout {
 struct Mirror {
     /// sanitized url of the mirror
     url: String,
-
-    /// layout of the mirror
-    layout: Layout,
 }
 
 #[derive(Clone)]
@@ -43,14 +40,7 @@ impl Fetcher {
             // sanitize url
             let url = String::from(url.trim_end_matches("/"));
 
-            // get mirror layout, if that fails don't add the mirror
-            let layout = mirror_layout(url.clone()).await.map_err(|e| e.to_string());
-            if layout.is_err() {
-                eprint!("Failed to get valid layout.conf from mirror {}. Ignoring mirror.", url);
-                continue;
-            }
-
-            mirrors.push(Mirror { url, layout: layout.unwrap() })
+            mirrors.push(Mirror { url })
         }
 
         if mirrors.is_empty() {
@@ -80,8 +70,19 @@ impl Fetcher {
     /// @param store BlobStorage use for storing the file
     async fn fetch_mirror(&mut self, file: &String, store: &BlobStorage) -> Result<(), String> {
         for _ in 0..self.mirrors.len() {
+            // select mirror
             let mirror = self.select_mirror();
-            let full_url = match mirror.layout {
+
+            // get mirror layout and ignore mirror if it's invalid
+            let layout = match mirror_layout(&mirror.url).await {
+                Ok(layout) => layout,
+                Err(e) => {
+                    eprintln!("Ignoring mirror {} due to bad layout.conf: {}", &mirror.url, e.to_string());
+                    continue;
+                }
+            };
+
+            let full_url = match layout {
                 Layout::FileNameHashBlake2B => format!("{}/distfiles/{}/{}",
                     mirror.url, utils::filename_hash_dir_blake2b(file.clone()).unwrap(), file),
             };
@@ -212,11 +213,14 @@ impl Fetcher {
 /// get the mirror layout
 /// for now this just matches that of the master mirror
 /// TODO: actually make this a proper lookup
-async fn mirror_layout(url: String) -> Result<Layout, Box<dyn std::error::Error>> {
-    let layout = reqwest::get(format!("{}/{}", url, "distfiles/layout.conf"))
-        .await?
-        .text()
-        .await?;
+async fn mirror_layout(url: &String) -> Result<Layout, String> {
+    let layout = match reqwest::get(format!("{}/{}", url, "distfiles/layout.conf")).await {
+        Ok(res) => match res.text().await {
+            Ok(text) => text,
+            Err(e) => return Err(e.to_string())
+        },
+        Err(e) => return Err(e.to_string())
+    };
 
     match layout.as_str() {
         "[structure]\n0=filename-hash BLAKE2B 8\n" => Ok(Layout::FileNameHashBlake2B),

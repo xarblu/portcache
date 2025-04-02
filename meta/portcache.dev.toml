@@ -9,6 +9,7 @@ location = "/tmp/portcache/distfiles"
 mirrors = [
     "https://ftp.halifax.rwth-aachen.de/gentoo/",
     "http://ftp.halifax.rwth-aachen.de/gentoo/",
+    "http://bad.mirror.invalid/gentoo/",
 ]
 
 [server]
