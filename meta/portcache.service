@@ -1,6 +1,7 @@
 [Unit]
 Description=Portage Distfiles Cache
-After=network.target
+After=nss-lookup.target
+Wants=nss-lookup.target
 
 [Service]
 User=portcache
