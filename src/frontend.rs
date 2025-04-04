@@ -62,8 +62,8 @@ async fn distfiles(
 /// launch the frontend webserver
 pub async fn launch(config: Arc<Config>) -> Result<(), String> {
     let cfg = rocket::config::Config {
-        address: config.server.address.clone(),
-        port: config.server.port.clone(),
+        address: config.server.address,
+        port: config.server.port,
         ..rocket::config::Config::default()
     };
 

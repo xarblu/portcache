@@ -25,10 +25,9 @@ impl ManifestWalker {
         ]);
 
         if !layout_conf.is_file() {
-            return Err(format!(
-                "Could not find metadata/layout.conf in repo root \
-                    - this doesn't look like a valid repo"
-            ));
+            return Err("Could not find metadata/layout.conf in repo root \
+                - this doesn't look like a valid repo"
+                .to_string());
         }
 
         Ok(Self { root })

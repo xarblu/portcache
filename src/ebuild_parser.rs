@@ -25,7 +25,7 @@ impl Ebuild {
     pub async fn parse(path: PathBuf) -> Result<Self, String> {
         let ebuild = match path.as_os_str().to_str() {
             Some(s) => s,
-            None => return Err(format!("Could not convert path to str")),
+            None => return Err("Could not convert path to str".to_string()),
         };
 
         // hook into portage python API for processing ebuilds

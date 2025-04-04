@@ -31,7 +31,7 @@ impl BlobStorage {
     /// @param config    Config struct
     /// @param location  root of the blob storage
     pub async fn new(config: &config::Config) -> Result<Self, Box<dyn std::error::Error>> {
-        let fetcher = Fetcher::new(&config).await?;
+        let fetcher = Fetcher::new(config).await?;
         let new = Self {
             location: config.storage.location.clone(),
             fetcher,
@@ -84,13 +84,13 @@ impl BlobStorage {
                 eprintln!(
                     "Error while downloading {}: {}",
                     name.clone(),
-                    chunk.err().unwrap().to_string()
+                    chunk.err().unwrap()
                 );
                 fs::remove_file(path).await?;
                 return Err("Download failed".into());
             }
 
-            writer.write(&chunk?).await?;
+            writer.write_all(&chunk?).await?;
         }
 
         writer.flush().await?;

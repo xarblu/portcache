@@ -26,14 +26,14 @@ impl RepoSyncer {
     /// @param config  a reference to Config
     /// @returns Err   when repo_storage_root couldn't be created or isn't writable
     pub async fn new(config: Arc<config::Config>) -> Result<Self, String> {
-        let sync_interval = time::Duration::from_secs(config.repo.sync_interval.clone() * 60);
+        let sync_interval = time::Duration::from_secs(config.repo.sync_interval * 60);
         let storage_root = config.repo.storage_root.clone();
         let repos = config.repo.repos.clone();
 
         if !storage_root.is_dir() {
             fs::create_dir(storage_root.as_path())
                 .await
-                .map_err(|e| format!("Failed to create repo storage root: {}", e.to_string()))?;
+                .map_err(|e| format!("Failed to create repo storage root: {}", e))?;
         }
 
         for repo in repos {
@@ -206,10 +206,10 @@ impl RepoSyncer {
             }
         }
 
-        if failed.len() == 0 {
+        if failed.is_empty() {
             Ok(())
         } else {
-            Err(format!("failed repos: {}", failed.join(", ")))
+            Err(format!("Failed repos: {}", failed.join(", ")))
         }
     }
 }

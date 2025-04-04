@@ -2,7 +2,6 @@ use serde::Deserialize;
 use std::fs;
 use std::net::IpAddr;
 use std::path::PathBuf;
-use toml;
 
 #[derive(Deserialize, Clone)]
 pub struct Config {

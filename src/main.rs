@@ -32,7 +32,7 @@ async fn main() {
     let args = Args::parse();
 
     let config = Arc::new(config::Config::parse(args.config).unwrap_or_else(|e| {
-        eprintln!("Failed to parse config: {}", e.to_string());
+        eprintln!("Failed to parse config: {}", e);
         std::process::exit(1);
     }));
 

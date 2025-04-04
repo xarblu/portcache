@@ -1,4 +1,3 @@
-use reqwest;
 use std::path::PathBuf;
 
 use crate::blob_storage::BlobStorage;
@@ -44,7 +43,7 @@ impl Fetcher {
         }
 
         if mirrors.is_empty() {
-            return Err(format!("Mirror list is empty"));
+            return Err("Mirror list is empty".to_string());
         }
 
         Ok(Self {
@@ -83,8 +82,7 @@ impl Fetcher {
                 Err(e) => {
                     eprintln!(
                         "Ignoring mirror {} due to bad layout.conf: {}",
-                        &mirror.url,
-                        e.to_string()
+                        &mirror.url, e
                     );
                     continue;
                 }
@@ -118,7 +116,7 @@ impl Fetcher {
             match store.store(file.clone(), &mut stream).await {
                 Ok(_) => (),
                 Err(e) => {
-                    eprintln!("GET {} failed: {}", &full_url, e.to_string());
+                    eprintln!("GET {} failed: {}", &full_url, e);
                     continue;
                 }
             };
@@ -237,8 +235,8 @@ impl Fetcher {
     /// attempt to fetch a distfile
     ///  1. try from a gentoo mirror
     ///  2. try parsing from SRC_URI
-    /// @param file  Name of the distfile
-    /// @param store BlobStorage use for storing the file
+    ///     @param file  Name of the distfile
+    ///     @param store BlobStorage use for storing the file
     pub async fn fetch(
         &mut self,
         file: String,
@@ -247,13 +245,13 @@ impl Fetcher {
         // first try a mirror fetch
         match self.fetch_mirror(&file, &store).await {
             Ok(_) => return Ok(()),
-            Err(e) => eprintln!("Mirror fetch failed: {}", e.to_string()),
+            Err(e) => eprintln!("Mirror fetch failed: {}", e),
         }
 
         // then try a SRC_URI fetch
         match self.fetch_src_uri(&file, &store).await {
             Ok(_) => return Ok(()),
-            Err(e) => eprintln!("SRC_URI fetch failed: {}", e.to_string()),
+            Err(e) => eprintln!("SRC_URI fetch failed: {}", e),
         }
 
         Err(format!("All fetches failed for {}", &file).into())
@@ -274,6 +272,6 @@ async fn mirror_layout(url: &String) -> Result<Layout, String> {
 
     match layout.as_str() {
         "[structure]\n0=filename-hash BLAKE2B 8\n" => Ok(Layout::FileNameHashBlake2B),
-        _ => Err(format!("Unknown layout in layout.conf: {}", layout).into()),
+        _ => Err(format!("Unknown layout in layout.conf: {}", layout)),
     }
 }
