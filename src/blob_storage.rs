@@ -1,10 +1,13 @@
-use tokio::{fs, io::{self, AsyncWriteExt}};
-use futures_core::stream::Stream;
 use futures::stream::StreamExt;
+use futures_core::stream::Stream;
+use tokio::{
+    fs,
+    io::{self, AsyncWriteExt},
+};
 
-use crate::utils;
-use crate::fetcher::Fetcher;
 use crate::config;
+use crate::fetcher::Fetcher;
+use crate::utils;
 
 /// storage for downloaded blobs
 #[derive(Clone)]
@@ -18,7 +21,7 @@ pub struct BlobStorage {
 
 impl BlobStorage {
     /// initialize a new blob storage directory structure
-    /// if it doesn't already 
+    /// if it doesn't already
     async fn init(&self) -> Result<(), Box<dyn std::error::Error>> {
         fs::create_dir(self.location.clone()).await?;
         Ok(())
@@ -45,9 +48,11 @@ impl BlobStorage {
     /// store a blob from a stream in the storage
     /// @param name  name of the blob
     /// @param blob  a bytes stream with the blob
-    pub async fn store(&self, name: String,
-        blob: &mut (impl Stream<Item = Result<bytes::Bytes, reqwest::Error>> + std::marker::Unpin))
-        -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn store(
+        &self,
+        name: String,
+        blob: &mut (impl Stream<Item = Result<bytes::Bytes, reqwest::Error>> + std::marker::Unpin),
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let path = format!(
             "{}/{}/{}",
             self.location.clone(),
@@ -59,7 +64,7 @@ impl BlobStorage {
         // file exists - for now just exit
         // although best case we don't even attempt to re-download
         if path.is_file() {
-            return Ok(())
+            return Ok(());
         }
 
         // create dir for this blob if needed
@@ -76,7 +81,11 @@ impl BlobStorage {
         while let Some(chunk) = blob.next().await {
             if chunk.is_err() {
                 writer.flush().await?;
-                eprintln!("Error while downloading {}: {}", name.clone(), chunk.err().unwrap().to_string());
+                eprintln!(
+                    "Error while downloading {}: {}",
+                    name.clone(),
+                    chunk.err().unwrap().to_string()
+                );
                 fs::remove_file(path).await?;
                 return Err("Download failed".into());
             }
@@ -98,12 +107,17 @@ impl BlobStorage {
     ///       lookup in the cache and can serve without locking
     /// @param digest  2 byte blake2b512 digest of the filename
     /// @param file    file name
-    pub async fn request(&mut self, digest: String, file: String) -> Result<std::path::PathBuf, Box<dyn std::error::Error>> {
+    pub async fn request(
+        &mut self,
+        digest: String,
+        file: String,
+    ) -> Result<std::path::PathBuf, Box<dyn std::error::Error>> {
         // where we expect the file in storage
-        let path = format!("{}/{}/{}",
-                self.location.clone(),
-                digest.clone(),
-                file.clone()
+        let path = format!(
+            "{}/{}/{}",
+            self.location.clone(),
+            digest.clone(),
+            file.clone()
         );
         let path = std::path::Path::new(&path);
 
@@ -111,7 +125,7 @@ impl BlobStorage {
         if path.is_file() {
             return Ok(path.to_path_buf());
         }
-        
+
         // then ask fetcher
         self.fetcher.fetch(file.clone(), self.clone()).await?;
         if path.is_file() {

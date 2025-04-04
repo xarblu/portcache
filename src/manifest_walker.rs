@@ -1,9 +1,9 @@
-use std::path::PathBuf;
 use std::ffi::OsStr;
-use walkdir::WalkDir;
-use tokio::io::AsyncBufReadExt;
+use std::path::PathBuf;
 use tokio::fs;
 use tokio::io;
+use tokio::io::AsyncBufReadExt;
+use walkdir::WalkDir;
 
 /// walk through Manifest files in a ebuild tree
 pub struct ManifestWalker {
@@ -19,13 +19,18 @@ impl ManifestWalker {
     pub fn new(root: PathBuf) -> Result<Self, String> {
         // in a valid tree we expect metadata/layout.conf to exist
         let layout_conf = PathBuf::from_iter([
-            root.clone().as_os_str(), OsStr::new("metadata"), OsStr::new("layout.conf")]);
+            root.clone().as_os_str(),
+            OsStr::new("metadata"),
+            OsStr::new("layout.conf"),
+        ]);
 
         if !layout_conf.is_file() {
-            return Err(format!("Could not find metadata/layout.conf in repo root \
-                    - this doesn't look like a valid repo"));
+            return Err(format!(
+                "Could not find metadata/layout.conf in repo root \
+                    - this doesn't look like a valid repo"
+            ));
         }
-        
+
         Ok(Self { root })
     }
 
@@ -48,20 +53,21 @@ impl ManifestWalker {
             // skip bad files
             let path = match manifest {
                 Ok(manifest) => manifest.path().to_owned(),
-                Err(_) => continue
+                Err(_) => continue,
             };
 
             let mut lines = match fs::File::open(path.clone()).await {
                 Ok(file) => io::BufReader::new(file).lines(),
-                Err(_) => continue
+                Err(_) => continue,
             };
 
             'parse_lines: while let Some(line) = match lines.next_line().await {
-                Ok(line) => line, Err(_) => break 'parse_lines
+                Ok(line) => line,
+                Err(_) => break 'parse_lines,
             } {
                 if line.contains(&pattern) {
                     println!("Found {} in {}", &pattern, path.to_string_lossy());
-                    return Ok(Some(PathBuf::from(&path)))
+                    return Ok(Some(PathBuf::from(&path)));
                 }
             }
         }

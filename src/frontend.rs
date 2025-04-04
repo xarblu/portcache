@@ -1,11 +1,11 @@
 use std::sync::Arc;
 
-use rocket::{get, State};
+use futures::lock::Mutex;
+use rocket::http;
 use rocket::response::stream::ReaderStream;
 use rocket::routes;
 use rocket::tokio::fs::File;
-use rocket::http;
-use futures::lock::Mutex;
+use rocket::{State, get};
 
 use crate::blob_storage::BlobStorage;
 use crate::config::Config;
@@ -27,7 +27,11 @@ async fn layout_conf() -> &'static str {
 
 /// map requests to distfiles
 #[get("/distfiles/<digest>/<file>")]
-async fn distfiles(digest: &str, file: &str, shared: &State<SharedData>) -> Result<ReaderStream![File], http::Status> {
+async fn distfiles(
+    digest: &str,
+    file: &str,
+    shared: &State<SharedData>,
+) -> Result<ReaderStream![File], http::Status> {
     // sanity checks
     // digest should be hex decodable and exactly 2 bytes
     if digest.len() != 2 {
@@ -49,30 +53,30 @@ async fn distfiles(digest: &str, file: &str, shared: &State<SharedData>) -> Resu
     let mut storage = shared.storage.lock().await;
     let blob = match storage.request(digest.to_string(), file.to_string()).await {
         Ok(b) => b,
-        Err(_) => return Err(http::Status::NotFound)
+        Err(_) => return Err(http::Status::NotFound),
     };
     let file = File::open(blob).await.map_err(|e| e.to_string()).unwrap();
     Ok(ReaderStream::one(file))
 }
 
 /// launch the frontend webserver
-pub async fn launch(
-    config: Arc<Config>,
-    ) -> Result<(), String> {
+pub async fn launch(config: Arc<Config>) -> Result<(), String> {
     let cfg = rocket::config::Config {
         address: config.server.address.clone(),
         port: config.server.port.clone(),
         ..rocket::config::Config::default()
     };
 
-
-    let storage = BlobStorage::new(&config).await.expect("Failed to initialize blob storage");
+    let storage = BlobStorage::new(&config)
+        .await
+        .expect("Failed to initialize blob storage");
     let _ = rocket::custom(cfg)
-        .manage(SharedData { storage: Mutex::new(storage) })
-        .mount("/", routes![layout_conf,distfiles])
+        .manage(SharedData {
+            storage: Mutex::new(storage),
+        })
+        .mount("/", routes![layout_conf, distfiles])
         .launch()
         .await;
 
     Ok(())
 }
-

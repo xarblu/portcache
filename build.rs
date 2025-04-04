@@ -18,10 +18,11 @@ fn main() {
     write!(
         f,
         "pub const PORTAGE_PYTHON: &str = \"{}\";\npub const SRC_URI_HELPER_PY: &str = \"{}\";\n",
-        portage_python.escape_default(), src_uri_helper_py.escape_default()
+        portage_python.escape_default(),
+        src_uri_helper_py.escape_default()
     )
     .unwrap();
-    
+
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-changed=meta/src_uri_helper.py");
     println!("cargo:rerun-if-env-changed=PORTAGE_PYTHON");

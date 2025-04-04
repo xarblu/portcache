@@ -9,20 +9,20 @@ use tokio_util::sync::CancellationToken;
 include!(concat!(env!("OUT_DIR"), "/build_vars.rs"));
 
 // modules in this crate
-mod frontend;
-mod utils;
-mod config;
-mod fetcher;
 mod blob_storage;
-mod repo_syncer;
-mod manifest_walker;
+mod config;
 mod ebuild_parser;
+mod fetcher;
+mod frontend;
+mod manifest_walker;
+mod repo_syncer;
+mod utils;
 
 /// Portage Distfile Cacher
 #[derive(Parser, Debug)]
 struct Args {
     /// Config File (defaults to ${PWD}/portcache.toml)
-    #[arg(short,long)]
+    #[arg(short, long)]
     config: Option<String>,
 }
 
@@ -31,12 +31,11 @@ struct Args {
 async fn main() {
     let args = Args::parse();
 
-    let config = Arc::new(config::Config::parse(args.config)
-        .unwrap_or_else(|e| {
-            eprintln!("Failed to parse config: {}", e.to_string());
-            std::process::exit(1);
-        }));
-    
+    let config = Arc::new(config::Config::parse(args.config).unwrap_or_else(|e| {
+        eprintln!("Failed to parse config: {}", e.to_string());
+        std::process::exit(1);
+    }));
+
     let mut tasks = tokio::task::JoinSet::new();
     let token = CancellationToken::new();
 
@@ -44,12 +43,12 @@ async fn main() {
 
     let repo_sync = RepoSyncer::new(config.clone()).await.unwrap();
     tasks.spawn(repo_sync.start(token.clone()));
-    
+
     // signal handler so we can shut things down
     tasks.spawn(async move {
         let mut sigint = tokio::signal::unix::signal(SignalKind::interrupt()).unwrap();
         let mut sigterm = tokio::signal::unix::signal(SignalKind::terminate()).unwrap();
-        
+
         tokio::select! {
             _ = sigint.recv() => {},
             _ = sigterm.recv() => {},

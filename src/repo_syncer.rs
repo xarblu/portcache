@@ -1,11 +1,11 @@
 use git2::Direction;
-use git2::ResetType;
 use git2::Repository;
-use tokio::time;
-use tokio::fs;
-use tokio_util::sync::CancellationToken;
+use git2::ResetType;
 use std::path::PathBuf;
 use std::sync::Arc;
+use tokio::fs;
+use tokio::time;
+use tokio_util::sync::CancellationToken;
 
 use crate::config;
 
@@ -35,16 +35,22 @@ impl RepoSyncer {
                 .await
                 .map_err(|e| format!("Failed to create repo storage root: {}", e.to_string()))?;
         }
-        
+
         for repo in repos {
             let mut path = storage_root.clone();
             match repo.split("/").last() {
                 Some(name) => path.push(name),
-                None => { eprintln!("Could't get name for repo: {}", repo); continue; }
+                None => {
+                    eprintln!("Could't get name for repo: {}", repo);
+                    continue;
+                }
             };
 
             if path.is_dir() {
-                println!("Skipping setup of existing repo at {}", path.to_string_lossy());
+                println!(
+                    "Skipping setup of existing repo at {}",
+                    path.to_string_lossy()
+                );
                 continue;
             }
 
@@ -55,12 +61,24 @@ impl RepoSyncer {
             let mut builder = git2::build::RepoBuilder::new();
             builder.fetch_options(options);
             match builder.clone(repo.as_str(), path.as_path()) {
-                Ok(_) => println!("Successfully cloned repo {} to {}", repo, path.to_string_lossy()),
-                Err(e) => eprintln!("Failed cloning repo {} to {}: {}", repo, path.to_string_lossy(), e)
+                Ok(_) => println!(
+                    "Successfully cloned repo {} to {}",
+                    repo,
+                    path.to_string_lossy()
+                ),
+                Err(e) => eprintln!(
+                    "Failed cloning repo {} to {}: {}",
+                    repo,
+                    path.to_string_lossy(),
+                    e
+                ),
             }
         }
-        
-        Ok(Self { sync_interval, storage_root })
+
+        Ok(Self {
+            sync_interval,
+            storage_root,
+        })
     }
 
     /// start RepoSyncer
@@ -85,19 +103,25 @@ impl RepoSyncer {
 
     /// perform a sync for all repos in storage_root
     ///
-    /// @returns 
+    /// @returns
     async fn sync(&self) -> Result<(), String> {
-        let repos = self.storage_root.clone()
+        let repos = self
+            .storage_root
+            .clone()
             .read_dir()
             .map_err(|e| e.to_string())?;
 
         let mut failed = Vec::new();
         for entry in repos {
             if let Err(e) = entry {
-                eprintln!("IO error while reading {}: {}", self.storage_root.clone().to_string_lossy(), e);
+                eprintln!(
+                    "IO error while reading {}: {}",
+                    self.storage_root.clone().to_string_lossy(),
+                    e
+                );
                 continue;
             }
-            
+
             let path = entry.unwrap().path();
             println!("Syncing repo: {}", path.to_string_lossy());
             let repo = match Repository::open(&path) {
@@ -106,13 +130,16 @@ impl RepoSyncer {
                     eprintln!("Failed to open repo: {}", e);
                     failed.push(String::from(path.to_string_lossy()));
                     continue;
-                },
+                }
             };
-            
+
             let mut remote = match repo.find_remote("origin") {
                 Ok(remote) => remote,
                 Err(_) => {
-                    eprintln!("Repository at {} doesn't have remote \"origin\" to fetch from - skipping", path.to_string_lossy());
+                    eprintln!(
+                        "Repository at {} doesn't have remote \"origin\" to fetch from - skipping",
+                        path.to_string_lossy()
+                    );
                     failed.push(String::from(path.to_string_lossy()));
                     continue;
                 }
@@ -137,14 +164,23 @@ impl RepoSyncer {
             let mut options = git2::FetchOptions::new();
             options.depth(1);
 
-            if let Err(e) = remote.fetch(&[default_branch.clone().as_str()], Some(&mut options), None) {
+            if let Err(e) =
+                remote.fetch(&[default_branch.clone().as_str()], Some(&mut options), None)
+            {
                 eprintln!("Failed to fetch repo: {}", e);
                 failed.push(String::from(path.to_string_lossy()));
                 continue;
             }
-            
-            let remote_tracking = format!("refs/remotes/origin/{}",
-                default_branch.clone().split("/").last().unwrap_or("main").to_owned());
+
+            let remote_tracking = format!(
+                "refs/remotes/origin/{}",
+                default_branch
+                    .clone()
+                    .split("/")
+                    .last()
+                    .unwrap_or("main")
+                    .to_owned()
+            );
             let fetch_head = match repo.find_reference(remote_tracking.as_str()) {
                 Ok(head) => head,
                 Err(e) => {
@@ -169,12 +205,11 @@ impl RepoSyncer {
                 continue;
             }
         }
-        
+
         if failed.len() == 0 {
             Ok(())
         } else {
             Err(format!("failed repos: {}", failed.join(", ")))
         }
     }
-
 }

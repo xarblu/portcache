@@ -1,11 +1,11 @@
 use reqwest;
 use std::path::PathBuf;
 
-use crate::utils;
 use crate::blob_storage::BlobStorage;
 use crate::config;
-use crate::manifest_walker::ManifestWalker;
 use crate::ebuild_parser::Ebuild;
+use crate::manifest_walker::ManifestWalker;
+use crate::utils;
 
 #[derive(Clone)]
 enum Layout {
@@ -47,7 +47,11 @@ impl Fetcher {
             return Err(format!("Mirror list is empty"));
         }
 
-        Ok(Self { mirrors, next_mirror: 0, repo_root })
+        Ok(Self {
+            mirrors,
+            next_mirror: 0,
+            repo_root,
+        })
     }
 
     /// select a mirror in round robin fashion
@@ -77,51 +81,73 @@ impl Fetcher {
             let layout = match mirror_layout(&mirror.url).await {
                 Ok(layout) => layout,
                 Err(e) => {
-                    eprintln!("Ignoring mirror {} due to bad layout.conf: {}", &mirror.url, e.to_string());
+                    eprintln!(
+                        "Ignoring mirror {} due to bad layout.conf: {}",
+                        &mirror.url,
+                        e.to_string()
+                    );
                     continue;
                 }
             };
 
             let full_url = match layout {
-                Layout::FileNameHashBlake2B => format!("{}/distfiles/{}/{}",
-                    mirror.url, utils::filename_hash_dir_blake2b(file.clone()).unwrap(), file),
+                Layout::FileNameHashBlake2B => format!(
+                    "{}/distfiles/{}/{}",
+                    mirror.url,
+                    utils::filename_hash_dir_blake2b(file.clone()).unwrap(),
+                    file
+                ),
             };
 
             println!("Fetching {}", &full_url);
 
             let mut stream = match reqwest::get(&full_url).await {
-                Err(e) => { eprintln!("{}", e); continue; },
-                Ok(response) => match response.error_for_status_ref() {
-                    Err(e) => { eprintln!("{}", e); continue; },
-                    Ok(_) => response.bytes_stream()
+                Err(e) => {
+                    eprintln!("{}", e);
+                    continue;
                 }
+                Ok(response) => match response.error_for_status_ref() {
+                    Err(e) => {
+                        eprintln!("{}", e);
+                        continue;
+                    }
+                    Ok(_) => response.bytes_stream(),
+                },
             };
 
             match store.store(file.clone(), &mut stream).await {
                 Ok(_) => (),
-                Err(e) => { eprintln!("GET {} failed: {}", &full_url, e.to_string()); continue; }
+                Err(e) => {
+                    eprintln!("GET {} failed: {}", &full_url, e.to_string());
+                    continue;
+                }
             };
 
             // only Ok when entire pipeline was success
             return Ok(());
         }
 
-        Err(format!("Couldn't fetch {} from any configured mirror", file))
+        Err(format!(
+            "Couldn't fetch {} from any configured mirror",
+            file
+        ))
     }
 
     /// utility method for fetching from SRC_URI
     ///
     /// @param file  Name of the distfile
     /// @param store BlobStorage use for storing the file
-    async fn fetch_src_uri(&mut self, file: &String, store: &BlobStorage) -> Result<(), Box<dyn std::error::Error>> {
+    async fn fetch_src_uri(
+        &mut self,
+        file: &String,
+        store: &BlobStorage,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let repos = self.repo_root.read_dir()?.filter_map(|x| match x {
+            Ok(x) if x.path().is_dir() => Some(x),
+            Ok(_) => None,
+            Err(_) => None,
+        });
 
-        let repos = self.repo_root.read_dir()?
-            .filter_map(|x| match x {
-                Ok(x) if x.path().is_dir() => Some(x),
-                Ok(_) => None,
-                Err(_) => None
-            });
-        
         // look through manifests and find a matching one
         let mut src_manifest = None;
         for repo in repos {
@@ -139,35 +165,49 @@ impl Fetcher {
 
         // can't find file via SRC_URI either...
         if src_manifest.is_none() {
-            return Err(format!("Could not find {} in Manifest of any configured repo", &file).into());
+            return Err(format!(
+                "Could not find {} in Manifest of any configured repo",
+                &file
+            )
+            .into());
         }
 
         // we found a match - yay
         // let's parse all related ebuilds
-        let ebuilds = src_manifest.unwrap().parent().unwrap()
-            .read_dir().map_err(|e| e.to_string())?
+        let ebuilds = src_manifest
+            .unwrap()
+            .parent()
+            .unwrap()
+            .read_dir()
+            .map_err(|e| e.to_string())?
             .filter_map(|x| match x {
                 Ok(x) => match x.path().extension() {
                     Some(y) if y == "ebuild" => Some(x),
                     Some(_) => None,
-                    None => None
+                    None => None,
                 },
-                Err(_) => None
+                Err(_) => None,
             });
-        
+
         let mut src_uri = None;
         for ebuild in ebuilds {
             println!("Checking {}", ebuild.path().to_string_lossy());
-            let parsed = Ebuild::parse(ebuild.path()).await.map_err(|e| e.to_string())?;
+            let parsed = Ebuild::parse(ebuild.path())
+                .await
+                .map_err(|e| e.to_string())?;
 
             if let Some(url) = parsed.src_uri().get(file) {
                 src_uri = Some(url.to_owned());
                 break;
             }
         }
-        
+
         if src_uri.is_none() {
-            return Err(format!("Could not find {} in any ebuild belonging to Manifest", &file).into());
+            return Err(format!(
+                "Could not find {} in any ebuild belonging to Manifest",
+                &file
+            )
+            .into());
         }
 
         // try all urls
@@ -175,11 +215,17 @@ impl Fetcher {
             println!("Fetching {}", url.clone());
 
             let mut stream = match reqwest::get(url).await {
-                Err(e) => { eprintln!("{}", e); continue; },
-                Ok(response) => match response.error_for_status_ref() {
-                    Err(e) => { eprintln!("{}", e); continue; },
-                    Ok(_) => response.bytes_stream()
+                Err(e) => {
+                    eprintln!("{}", e);
+                    continue;
                 }
+                Ok(response) => match response.error_for_status_ref() {
+                    Err(e) => {
+                        eprintln!("{}", e);
+                        continue;
+                    }
+                    Ok(_) => response.bytes_stream(),
+                },
             };
 
             store.store(file.clone(), &mut stream).await?;
@@ -193,17 +239,21 @@ impl Fetcher {
     ///  2. try parsing from SRC_URI
     /// @param file  Name of the distfile
     /// @param store BlobStorage use for storing the file
-    pub async fn fetch(&mut self, file: String, store: BlobStorage) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn fetch(
+        &mut self,
+        file: String,
+        store: BlobStorage,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         // first try a mirror fetch
         match self.fetch_mirror(&file, &store).await {
             Ok(_) => return Ok(()),
-            Err(e) => eprintln!("Mirror fetch failed: {}", e.to_string())
+            Err(e) => eprintln!("Mirror fetch failed: {}", e.to_string()),
         }
 
         // then try a SRC_URI fetch
         match self.fetch_src_uri(&file, &store).await {
             Ok(_) => return Ok(()),
-            Err(e) => eprintln!("SRC_URI fetch failed: {}", e.to_string())
+            Err(e) => eprintln!("SRC_URI fetch failed: {}", e.to_string()),
         }
 
         Err(format!("All fetches failed for {}", &file).into())
@@ -217,9 +267,9 @@ async fn mirror_layout(url: &String) -> Result<Layout, String> {
     let layout = match reqwest::get(format!("{}/{}", url, "distfiles/layout.conf")).await {
         Ok(res) => match res.text().await {
             Ok(text) => text,
-            Err(e) => return Err(e.to_string())
+            Err(e) => return Err(e.to_string()),
         },
-        Err(e) => return Err(e.to_string())
+        Err(e) => return Err(e.to_string()),
     };
 
     match layout.as_str() {
