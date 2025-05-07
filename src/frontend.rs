@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use futures::lock::Mutex;
 use rocket::http;
 use rocket::response::stream::ReaderStream;
 use rocket::routes;
@@ -9,11 +8,11 @@ use rocket::{State, get};
 
 use crate::blob_storage::BlobStorage;
 use crate::config::Config;
+use crate::utils;
 
 struct SharedData {
-    /// BlobStorage wrapped in a Mutex
-    /// for inner mutability required by rocket
-    storage: Mutex<BlobStorage>,
+    /// BlobStorage for requesting blobs
+    storage: BlobStorage,
 }
 
 /// the layout.conf file indicating how files
@@ -32,15 +31,20 @@ async fn distfiles(
     file: &str,
     shared: &State<SharedData>,
 ) -> Result<ReaderStream![File], http::Status> {
-    // sanity checks
-    // digest should be hex decodable and exactly 2 bytes
-    if digest.len() != 2 {
-        eprintln!("Received digest with bad length: {}", digest);
-        return Err(http::Status::BadRequest);
-        //return (http::Status::BadRequest, None);
-    } else if hex::decode(digest).is_err() {
-        eprintln!("Received digest with bad content: {}", digest);
-        return Err(http::Status::BadRequest);
+    // verify that digest matches file
+    match utils::filename_hash_dir_blake2b(file.to_string()) {
+        Ok(x) if x == *digest => {}
+        Ok(x) => {
+            eprintln!(
+                "Bad digest for file {}: Expected {}, Got {}",
+                file, x, digest
+            );
+            return Err(http::Status::BadRequest);
+        }
+        Err(_) => {
+            eprintln!("Something went wrong when calculating digest for {}", file);
+            return Err(http::Status::InternalServerError);
+        }
     }
 
     // file can be anything but not contain a / path seperator
@@ -50,8 +54,7 @@ async fn distfiles(
         return Err(http::Status::BadRequest);
     }
 
-    let mut storage = shared.storage.lock().await;
-    let blob = match storage.request(digest.to_string(), file.to_string()).await {
+    let blob = match shared.storage.request(&file.to_string()).await {
         Ok(b) => b,
         Err(_) => return Err(http::Status::NotFound),
     };
@@ -71,9 +74,7 @@ pub async fn launch(config: Arc<Config>) -> Result<(), String> {
         .await
         .expect("Failed to initialize blob storage");
     let _ = rocket::custom(cfg)
-        .manage(SharedData {
-            storage: Mutex::new(storage),
-        })
+        .manage(SharedData { storage })
         .mount("/", routes![layout_conf, distfiles])
         .launch()
         .await;
