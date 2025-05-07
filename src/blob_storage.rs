@@ -1,4 +1,9 @@
+use std::collections::HashMap;
+
+use futures::lock::Mutex;
+use std::sync::Arc;
 use tokio::fs;
+use tokio::sync::Notify;
 
 use crate::config;
 use crate::fetcher::Fetcher;
@@ -11,6 +16,10 @@ pub struct BlobStorage {
 
     /// Fetcher used for fetching missing files
     fetcher: Fetcher,
+
+    /// tracker for Fetcher jobs
+    /// maps file name to notifier to wait on
+    fetch_jobs: Mutex<HashMap<String, Arc<Notify>>>,
 }
 
 impl BlobStorage {
@@ -29,6 +38,7 @@ impl BlobStorage {
         let new = Self {
             location: config.storage.location.clone(),
             fetcher,
+            fetch_jobs: Mutex::new(HashMap::new()),
         };
 
         if !fs::try_exists(new.location.clone()).await? {
@@ -51,14 +61,8 @@ impl BlobStorage {
         Ok(std::path::PathBuf::from(&path))
     }
 
-    /// get an AsyncReader to the requested file
+    /// get a PathBuf to the requested file
     /// if the file isn't cached we will request the fetcher to fetch it
-    /// TODO: verify request digest matches filename
-    /// TODO: _should_ be thread safe since for now since BlobStorage
-    ///       is locked with a mutex from the rocket side
-    /// TODO: should probably split this to a try_request() which does a read only
-    ///       lookup in the cache and can serve without locking
-    /// @param digest  2 byte blake2b512 digest of the filename
     /// @param file    file name
     pub async fn request(
         &self,
@@ -67,17 +71,76 @@ impl BlobStorage {
         // where we expect the file in storage
         let path = self.blob_location(file).await?;
 
-        // first check if it's already there
-        if path.is_file() {
-            return Ok(path.to_path_buf());
+        // this tokio::select! abonination is needed
+        // to get scoped fetch_jobs so the lock gets released again...
+        let active_job = tokio::select! {
+            mut fetch_jobs = self.fetch_jobs.lock() => {
+                match fetch_jobs.get(file) {
+                    // fetch job running so we should wait
+                    Some(job) => Some(job.clone()),
+                    // no running fetch job
+                    None => {
+                        if path.is_file() {
+                            // file should always fully exist in this case
+                            println!("Cache hit on {}", file);
+                            return Ok(path.to_path_buf());
+                        } else {
+                            // not fetched yet, this thread should fetch
+                            fetch_jobs.insert(file.to_string(), Arc::new(Notify::new()));
+                            None
+                        }
+                    }
+                }
+            }
+        };
+
+        // wait outside the above to get lock on fetch_jobs released
+        if let Some(active_job) = active_job {
+            println!("Already fetching {} - waiting until complete", file);
+            active_job.notified().await;
+            if path.is_file() {
+                // usually the file should exist now
+                // unless an error ocurred
+                return Ok(path.to_path_buf());
+            }
         }
 
         // then ask fetcher
-        self.fetcher.fetch(file, self).await?;
+        if self.fetcher.fetch(file, self).await.is_err() {
+            // cleanup failed file
+            if path.is_file() {
+                fs::remove_file(&path)
+                    .await
+                    .expect("could not clean up bad fetch");
+            }
+            // if we have tasks waiting notify one to retry, else drop the job
+            tokio::select! {
+                mut fetch_jobs = self.fetch_jobs.lock() => {
+                    if let Some(notify) = fetch_jobs.get(file) {
+                        if Arc::strong_count(notify) > 1 {
+                            eprintln!("Notifying waiting threads to retry download for {}", file);
+                            notify.notify_one();
+                            return Err(format!("Could not download file {}", file).into());
+                        } else {
+                            eprintln!("No waiting threads - not retrying download for {}", file);
+                            fetch_jobs.remove(file);
+                        }
+                    }
+                }
+            }
+        }
+
+        // if we successfully fetched, remove job and notify all
+        if let Some(notify) = self.fetch_jobs.lock().await.remove(file) {
+            println!("Finished downloading {}", file);
+            notify.notify_waiters();
+        }
+
+        // finish this thread
         if path.is_file() {
             return Ok(path.to_path_buf());
         }
 
-        Err(format!("Could not obtain file {}", file).into())
+        Err(format!("Could not download file {}", file).into())
     }
 }

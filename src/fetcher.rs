@@ -264,7 +264,7 @@ impl Fetcher {
 
         // try all urls
         for url in src_uri.unwrap() {
-            println!("Fetching {}", url.clone());
+            println!("Fetching {}", &url);
 
             let mut stream = match reqwest::get(url).await {
                 Err(e) => {
@@ -291,11 +291,7 @@ impl Fetcher {
     ///  2. try parsing from SRC_URI
     ///     @param file  Name of the distfile
     ///     @param store BlobStorage use for storing the file
-    pub async fn fetch(
-        &self,
-        file: &String,
-        store: &BlobStorage,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn fetch(&self, file: &String, store: &BlobStorage) -> Result<(), ()> {
         // first try a mirror fetch
         match self.fetch_mirror(file, store).await {
             Ok(_) => return Ok(()),
@@ -308,7 +304,8 @@ impl Fetcher {
             Err(e) => eprintln!("SRC_URI fetch failed: {}", e),
         }
 
-        Err(format!("All fetches failed for {}", &file).into())
+        eprintln!("All fetches failed for {}", &file);
+        Err(())
     }
 }
 
