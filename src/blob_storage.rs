@@ -1,22 +1,25 @@
-use futures::stream::StreamExt;
-use futures_core::stream::Stream;
-use tokio::{
-    fs,
-    io::{self, AsyncWriteExt},
-};
+use std::collections::HashMap;
+
+use futures::lock::Mutex;
+use std::sync::Arc;
+use tokio::fs;
+use tokio::sync::Notify;
 
 use crate::config;
 use crate::fetcher::Fetcher;
 use crate::utils;
 
 /// storage for downloaded blobs
-#[derive(Clone)]
 pub struct BlobStorage {
     /// root of the blob storage
     location: String,
 
     /// Fetcher used for fetching missing files
     fetcher: Fetcher,
+
+    /// tracker for Fetcher jobs
+    /// maps file name to notifier to wait on
+    fetch_jobs: Mutex<HashMap<String, Arc<Notify>>>,
 }
 
 impl BlobStorage {
@@ -35,6 +38,7 @@ impl BlobStorage {
         let new = Self {
             location: config.storage.location.clone(),
             fetcher,
+            fetch_jobs: Mutex::new(HashMap::new()),
         };
 
         if !fs::try_exists(new.location.clone()).await? {
@@ -45,93 +49,98 @@ impl BlobStorage {
         Ok(new)
     }
 
-    /// store a blob from a stream in the storage
-    /// @param name  name of the blob
-    /// @param blob  a bytes stream with the blob
-    pub async fn store(
-        &self,
-        name: String,
-        blob: &mut (impl Stream<Item = Result<bytes::Bytes, reqwest::Error>> + std::marker::Unpin),
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    /// get storage location for a blob
+    /// @param name  Name of the blob
+    pub async fn blob_location(&self, name: &String) -> Result<std::path::PathBuf, String> {
         let path = format!(
             "{}/{}/{}",
-            self.location.clone(),
-            utils::filename_hash_dir_blake2b(name.clone())?,
-            name.clone(),
+            &self.location,
+            utils::filename_hash_dir_blake2b(name.clone()).map_err(|x| x.to_string())?,
+            &name
         );
-        let path = std::path::Path::new(&path);
-
-        // file exists - for now just exit
-        // although best case we don't even attempt to re-download
-        if path.is_file() {
-            return Ok(());
-        }
-
-        // create dir for this blob if needed
-        // assert that parent is not / or empty
-        assert!(path.parent().is_some());
-        if !path.parent().unwrap().is_dir() {
-            fs::create_dir(path.parent().unwrap()).await?;
-        }
-
-        // write file chunks
-        let file = fs::File::create(path).await?;
-        let mut writer = io::BufWriter::new(file);
-
-        while let Some(chunk) = blob.next().await {
-            if chunk.is_err() {
-                writer.flush().await?;
-                eprintln!(
-                    "Error while downloading {}: {}",
-                    name.clone(),
-                    chunk.err().unwrap()
-                );
-                fs::remove_file(path).await?;
-                return Err("Download failed".into());
-            }
-
-            writer.write_all(&chunk?).await?;
-        }
-
-        writer.flush().await?;
-
-        Ok(())
+        Ok(std::path::PathBuf::from(&path))
     }
 
-    /// get an AsyncReader to the requested file
+    /// get a PathBuf to the requested file
     /// if the file isn't cached we will request the fetcher to fetch it
-    /// TODO: verify request digest matches filename
-    /// TODO: _should_ be thread safe since for now since BlobStorage
-    ///       is locked with a mutex from the rocket side
-    /// TODO: should probably split this to a try_request() which does a read only
-    ///       lookup in the cache and can serve without locking
-    /// @param digest  2 byte blake2b512 digest of the filename
     /// @param file    file name
     pub async fn request(
-        &mut self,
-        digest: String,
-        file: String,
+        &self,
+        file: &String,
     ) -> Result<std::path::PathBuf, Box<dyn std::error::Error>> {
         // where we expect the file in storage
-        let path = format!(
-            "{}/{}/{}",
-            self.location.clone(),
-            digest.clone(),
-            file.clone()
-        );
-        let path = std::path::Path::new(&path);
+        let path = self.blob_location(file).await?;
 
-        // first check if it's already there
-        if path.is_file() {
-            return Ok(path.to_path_buf());
+        // this tokio::select! abonination is needed
+        // to get scoped fetch_jobs so the lock gets released again...
+        let active_job = tokio::select! {
+            mut fetch_jobs = self.fetch_jobs.lock() => {
+                match fetch_jobs.get(file) {
+                    // fetch job running so we should wait
+                    Some(job) => Some(job.clone()),
+                    // no running fetch job
+                    None => {
+                        if path.is_file() {
+                            // file should always fully exist in this case
+                            println!("Cache hit on {}", file);
+                            return Ok(path.to_path_buf());
+                        } else {
+                            // not fetched yet, this thread should fetch
+                            fetch_jobs.insert(file.to_string(), Arc::new(Notify::new()));
+                            None
+                        }
+                    }
+                }
+            }
+        };
+
+        // wait outside the above to get lock on fetch_jobs released
+        if let Some(active_job) = active_job {
+            println!("Already fetching {} - waiting until complete", file);
+            active_job.notified().await;
+            if path.is_file() {
+                // usually the file should exist now
+                // unless an error ocurred
+                return Ok(path.to_path_buf());
+            }
         }
 
         // then ask fetcher
-        self.fetcher.fetch(file.clone(), self.clone()).await?;
+        if self.fetcher.fetch(file, self).await.is_err() {
+            // cleanup failed file
+            if path.is_file() {
+                fs::remove_file(&path)
+                    .await
+                    .expect("could not clean up bad fetch");
+            }
+            // if we have tasks waiting notify one to retry, else drop the job
+            tokio::select! {
+                mut fetch_jobs = self.fetch_jobs.lock() => {
+                    if let Some(notify) = fetch_jobs.get(file) {
+                        if Arc::strong_count(notify) > 1 {
+                            eprintln!("Notifying waiting threads to retry download for {}", file);
+                            notify.notify_one();
+                            return Err(format!("Could not download file {}", file).into());
+                        } else {
+                            eprintln!("No waiting threads - not retrying download for {}", file);
+                            fetch_jobs.remove(file);
+                        }
+                    }
+                }
+            }
+        }
+
+        // if we successfully fetched, remove job and notify all
+        if let Some(notify) = self.fetch_jobs.lock().await.remove(file) {
+            println!("Finished downloading {}", file);
+            notify.notify_waiters();
+        }
+
+        // finish this thread
         if path.is_file() {
             return Ok(path.to_path_buf());
         }
 
-        Err(format!("Could not obtain file {}", file.clone()).into())
+        Err(format!("Could not download file {}", file).into())
     }
 }
