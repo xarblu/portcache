@@ -39,7 +39,7 @@ impl Fetcher {
     /// create a new Fetcher
     pub async fn new(config: &config::Config) -> Result<Self, String> {
         let mut mirrors: Vec<Mirror> = Vec::new();
-        let repo_root = config.repo.storage_root.clone();
+        let repo_root = config.storage.location.join("repos");
 
         for url in config.fetcher.mirrors.clone() {
             // sanitize url
@@ -146,7 +146,7 @@ impl Fetcher {
                 Layout::FileNameHashBlake2B => format!(
                     "{}/distfiles/{}/{}",
                     mirror.url,
-                    utils::filename_hash_dir_blake2b(file.clone()).unwrap(),
+                    utils::filename_hash_dir_blake2b(file).unwrap(),
                     file
                 ),
             };

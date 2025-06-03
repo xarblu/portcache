@@ -5,16 +5,16 @@ use std::path::PathBuf;
 
 #[derive(Deserialize, Clone)]
 pub struct Config {
-    pub storage: BlobStorageConfig,
+    pub storage: StorageConfig,
     pub fetcher: FetcherConfig,
     pub server: ServerConfig,
     pub repo: RepoConfig,
 }
 
 #[derive(Deserialize, Clone)]
-pub struct BlobStorageConfig {
-    /// where cached files are located
-    pub location: String,
+pub struct StorageConfig {
+    /// storage root
+    pub location: PathBuf,
 }
 
 #[derive(Deserialize, Clone)]
@@ -38,9 +38,6 @@ pub struct ServerConfig {
 pub struct RepoConfig {
     /// interval in which to sync repos in minutes
     pub sync_interval: u64,
-
-    /// path where the synced repos should be stored
-    pub storage_root: PathBuf,
 
     /// list of repo urls to clone
     pub repos: Vec<String>,

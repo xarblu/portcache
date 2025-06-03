@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::path::PathBuf;
 
 use futures::lock::Mutex;
 use std::sync::Arc;
@@ -12,7 +13,7 @@ use crate::utils;
 /// storage for downloaded blobs
 pub struct BlobStorage {
     /// root of the blob storage
-    location: String,
+    location: PathBuf,
 
     /// Fetcher used for fetching missing files
     fetcher: Fetcher,
@@ -36,13 +37,13 @@ impl BlobStorage {
     pub async fn new(config: &config::Config) -> Result<Self, Box<dyn std::error::Error>> {
         let fetcher = Fetcher::new(config).await?;
         let new = Self {
-            location: config.storage.location.clone(),
+            location: config.storage.location.join("distfiles"),
             fetcher,
             fetch_jobs: Mutex::new(HashMap::new()),
         };
 
-        if !fs::try_exists(new.location.clone()).await? {
-            println!("Initializing blob storage at {}", new.location.clone());
+        if !new.location.exists() {
+            println!("Initializing blob storage at {}", new.location.to_string_lossy());
             new.init().await?;
         }
 
@@ -52,12 +53,9 @@ impl BlobStorage {
     /// get storage location for a blob
     /// @param name  Name of the blob
     pub async fn blob_location(&self, name: &String) -> Result<std::path::PathBuf, String> {
-        let path = format!(
-            "{}/{}/{}",
-            &self.location,
-            utils::filename_hash_dir_blake2b(name.clone()).map_err(|x| x.to_string())?,
-            &name
-        );
+        let path = self.location
+            .join(utils::filename_hash_dir_blake2b(name).map_err(|x| x.to_string())?)
+            .join(name);
         Ok(std::path::PathBuf::from(&path))
     }
 

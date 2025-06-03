@@ -27,7 +27,7 @@ impl RepoSyncer {
     /// @returns Err   when repo_storage_root couldn't be created or isn't writable
     pub async fn new(config: Arc<config::Config>) -> Result<Self, String> {
         let sync_interval = time::Duration::from_secs(config.repo.sync_interval * 60);
-        let storage_root = config.repo.storage_root.clone();
+        let storage_root = config.storage.location.join("repos");
         let repos = config.repo.repos.clone();
 
         if !storage_root.is_dir() {

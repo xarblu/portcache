@@ -1,6 +1,6 @@
 [storage]
-# Storage location of the cache
-location = "/var/cache/portcache/distfiles"
+# Storage location for portcache
+location = "/var/cache/portcache"
 
 [fetcher]
 # Gentoo mirrors to use for fetching
@@ -18,9 +18,6 @@ port = 8000
 [repo]
 # sync interval in minutes
 sync_interval = 5
-
-# directory where repos are stored
-storage_root = "/var/cache/portcache/repos"
 
 # list of repo urls
 repos = [

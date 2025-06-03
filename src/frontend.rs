@@ -32,7 +32,7 @@ async fn distfiles(
     shared: &State<SharedData>,
 ) -> Result<ReaderStream![File], http::Status> {
     // verify that digest matches file
-    match utils::filename_hash_dir_blake2b(file.to_string()) {
+    match utils::filename_hash_dir_blake2b(&file.to_string()) {
         Ok(x) if x == *digest => {}
         Ok(x) => {
             eprintln!(
