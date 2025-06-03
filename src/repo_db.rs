@@ -20,6 +20,7 @@ impl RepoDB {
         match db.execute(
             "CREATE TABLE IF NOT EXISTS manifest (
                 file    TEXT PRIMARY KEY NOT NULL,
+                size    INTEGER NOT NULL,
                 blake2b TEXT NOT NULL,
                 sha512  TEXT NOT NULL
             )",
