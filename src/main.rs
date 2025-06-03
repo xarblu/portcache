@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use clap::Parser;
 use repo_syncer::RepoSyncer;
 use rocket::{Build, Rocket};
@@ -39,12 +37,12 @@ struct SharedData {
 async fn rocket() -> Rocket<Build> {
     let args = Args::parse();
 
-    let config = Arc::new(Config::parse(args.config).unwrap_or_else(|e| {
+    let config = Config::parse(args.config).unwrap_or_else(|e| {
         eprintln!("Failed to parse config: {}", e);
         std::process::exit(1);
-    }));
+    });
 
-    let repo_sync = RepoSyncer::new(config.clone()).await.unwrap();
+    let repo_sync = RepoSyncer::new(&config).await.unwrap();
     task::spawn(repo_sync.start());
 
     let storage = BlobStorage::new(&config)
