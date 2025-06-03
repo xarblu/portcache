@@ -1,6 +1,6 @@
 use clap::Parser;
-use repo_syncer::RepoSyncer;
 use rocket::{Build, Rocket};
+use std::sync::{Arc, Mutex};
 use tokio::task;
 
 // import vars from build.rs
@@ -13,11 +13,14 @@ mod ebuild_parser;
 mod fetcher;
 mod frontend;
 mod manifest_walker;
+mod repo_db;
 mod repo_syncer;
 mod utils;
 
 use crate::blob_storage::BlobStorage;
 use crate::config::Config;
+use crate::repo_db::RepoDB;
+use crate::repo_syncer::RepoSyncer;
 
 /// Portage Distfile Cacher
 #[derive(Parser, Debug)]
@@ -42,7 +45,15 @@ async fn rocket() -> Rocket<Build> {
         std::process::exit(1);
     });
 
-    let repo_sync = RepoSyncer::new(&config).await.unwrap();
+    let repo_db = Arc::new(Mutex::new(match RepoDB::new(&config) {
+        Ok(db) => db,
+        Err(e) => {
+            eprintln!("Failed to initialize database: {}", e);
+            std::process::exit(1);
+        }
+    }));
+
+    let repo_sync = RepoSyncer::new(&config, repo_db.clone()).await.unwrap();
     task::spawn(repo_sync.start());
 
     let storage = BlobStorage::new(&config)

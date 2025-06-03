@@ -2,10 +2,12 @@ use git2::Direction;
 use git2::Repository;
 use git2::ResetType;
 use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
 use tokio::fs;
 use tokio::time;
 
 use crate::config::Config;
+use crate::repo_db::RepoDB;
 
 /// struct to clone and sync portage repos
 pub struct RepoSyncer {
@@ -23,7 +25,7 @@ impl RepoSyncer {
     ///
     /// @param config  a reference to Config
     /// @returns Err   when repo_storage_root couldn't be created or isn't writable
-    pub async fn new(config: &Config) -> Result<Self, String> {
+    pub async fn new(config: &Config, repo_db: Arc<Mutex<RepoDB>>) -> Result<Self, String> {
         let sync_interval = time::Duration::from_secs(config.repo.sync_interval * 60);
         let storage_root = config.storage.location.join("repos");
         let repos = config.repo.repos.clone();
