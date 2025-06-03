@@ -43,7 +43,10 @@ impl BlobStorage {
         };
 
         if !new.location.exists() {
-            println!("Initializing blob storage at {}", new.location.to_string_lossy());
+            println!(
+                "Initializing blob storage at {}",
+                new.location.to_string_lossy()
+            );
             new.init().await?;
         }
 
@@ -53,7 +56,8 @@ impl BlobStorage {
     /// get storage location for a blob
     /// @param name  Name of the blob
     pub async fn blob_location(&self, name: &String) -> Result<std::path::PathBuf, String> {
-        let path = self.location
+        let path = self
+            .location
             .join(utils::filename_hash_dir_blake2b(name).map_err(|x| x.to_string())?)
             .join(name);
         Ok(std::path::PathBuf::from(&path))

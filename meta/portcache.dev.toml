@@ -21,7 +21,7 @@ port = 8000
 
 [repo]
 # sync interval in minutes
-sync_interval = 5
+sync_interval = 1
 
 # list of repo urls
 repos = ["https://github.com/xarblu/xarblu-overlay"]

@@ -5,7 +5,6 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::fs;
 use tokio::time;
-use tokio_util::sync::CancellationToken;
 
 use crate::config;
 
@@ -84,14 +83,10 @@ impl RepoSyncer {
     /// start RepoSyncer
     /// this is expected to be called from a tokio::spawn
     /// and consumes RepoSyncer
-    ///
-    /// @param token  a tokio_util::sync::CancellationToken
-    /// doesn't return until a CancellatioToken is received
-    pub async fn start(self, token: CancellationToken) -> Result<(), String> {
+    pub async fn start(self) -> Result<(), String> {
         let mut interval = time::interval(self.sync_interval);
         loop {
             tokio::select! {
-                _ = token.cancelled() => { return Ok(()) },
                 _ = interval.tick() => {
                     if let Err(e) = self.sync().await {
                         eprintln!("Sync failed: {}", e);

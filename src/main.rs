@@ -2,8 +2,8 @@ use std::sync::Arc;
 
 use clap::Parser;
 use repo_syncer::RepoSyncer;
-use tokio::signal::unix::SignalKind;
-use tokio_util::sync::CancellationToken;
+use rocket::{Build, Rocket};
+use tokio::task;
 
 // import vars from build.rs
 include!(concat!(env!("OUT_DIR"), "/build_vars.rs"));
@@ -18,6 +18,9 @@ mod manifest_walker;
 mod repo_syncer;
 mod utils;
 
+use crate::blob_storage::BlobStorage;
+use crate::config::Config;
+
 /// Portage Distfile Cacher
 #[derive(Parser, Debug)]
 struct Args {
@@ -26,37 +29,40 @@ struct Args {
     config: Option<String>,
 }
 
+struct SharedData {
+    /// BlobStorage for requesting blobs
+    blob_storage: BlobStorage,
+}
+
 /// Main
-#[tokio::main]
-async fn main() {
+#[rocket::launch]
+async fn rocket() -> Rocket<Build> {
     let args = Args::parse();
 
-    let config = Arc::new(config::Config::parse(args.config).unwrap_or_else(|e| {
+    let config = Arc::new(Config::parse(args.config).unwrap_or_else(|e| {
         eprintln!("Failed to parse config: {}", e);
         std::process::exit(1);
     }));
 
-    let mut tasks = tokio::task::JoinSet::new();
-    let token = CancellationToken::new();
-
-    tasks.spawn(frontend::launch(config.clone()));
-
     let repo_sync = RepoSyncer::new(config.clone()).await.unwrap();
-    tasks.spawn(repo_sync.start(token.clone()));
+    task::spawn(repo_sync.start());
 
-    // signal handler so we can shut things down
-    tasks.spawn(async move {
-        let mut sigint = tokio::signal::unix::signal(SignalKind::interrupt()).unwrap();
-        let mut sigterm = tokio::signal::unix::signal(SignalKind::terminate()).unwrap();
+    let storage = BlobStorage::new(&config)
+        .await
+        .expect("Failed to initialize blob storage");
 
-        tokio::select! {
-            _ = sigint.recv() => {},
-            _ = sigterm.recv() => {},
-        }
+    let cfg = rocket::config::Config {
+        address: config.server.address,
+        port: config.server.port,
+        ..rocket::config::Config::default()
+    };
 
-        token.cancel();
-        Ok(())
-    });
+    let shared = SharedData {
+        blob_storage: storage,
+    };
 
-    tasks.join_all().await;
+    rocket::custom(cfg).manage(shared).mount(
+        "/",
+        rocket::routes![frontend::layout_conf, frontend::distfiles],
+    )
 }
