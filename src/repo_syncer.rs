@@ -294,6 +294,7 @@ impl RepoSyncer {
 
                 // add src_uris to database
                 //self.repo_db.
+                panic!("Not Implemented!");
             }
         }
         
