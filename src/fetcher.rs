@@ -2,6 +2,7 @@ use futures::lock::Mutex;
 use futures::stream::StreamExt;
 use futures_core::stream::Stream;
 use std::path::PathBuf;
+use std::sync::Arc;
 use tokio::{
     fs,
     io::{self, AsyncWriteExt},
@@ -11,6 +12,7 @@ use crate::blob_storage::BlobStorage;
 use crate::config;
 use crate::ebuild_parser::Ebuild;
 use crate::manifest_walker::ManifestWalker;
+use crate::repo_db::RepoDB;
 use crate::utils;
 
 #[derive(Clone)]
@@ -31,15 +33,14 @@ pub struct Fetcher {
     /// next mirror tracker for round robin load balancing
     next_mirror: Mutex<usize>,
 
-    /// root of the repo storage
-    repo_root: PathBuf,
+    /// repo database
+    repo_db: Arc<Mutex<RepoDB>>,
 }
 
 impl Fetcher {
     /// create a new Fetcher
-    pub async fn new(config: &config::Config) -> Result<Self, String> {
+    pub async fn new(config: &config::Config, repo_db: Arc<Mutex<RepoDB>>) -> Result<Self, String> {
         let mut mirrors: Vec<Mirror> = Vec::new();
-        let repo_root = config.storage.location.join("repos");
 
         for url in config.fetcher.mirrors.clone() {
             // sanitize url
@@ -55,7 +56,7 @@ impl Fetcher {
         Ok(Self {
             mirrors,
             next_mirror: Mutex::new(0),
-            repo_root,
+            repo_db,
         })
     }
 
@@ -194,79 +195,21 @@ impl Fetcher {
         file: &String,
         store: &BlobStorage,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let repos = self.repo_root.read_dir()?.filter_map(|x| match x {
-            Ok(x) if x.path().is_dir() => Some(x),
-            Ok(_) => None,
-            Err(_) => None,
-        });
 
-        // look through manifests and find a matching one
-        let mut src_manifest = None;
-        for repo in repos {
-            println!("Checking repo {}", repo.path().to_string_lossy());
-            let manifests = ManifestWalker::new(repo.path()).map_err(|e| e.to_string())?;
-            src_manifest = match manifests.search(file.clone()).await {
-                Ok(manifest) => manifest,
-                Err(_) => continue,
-            };
-
-            if src_manifest.is_some() {
-                break;
+        // try all uris
+        let uris = tokio::select! {
+            db = self.repo_db.lock() => {
+                match db.get_src_uri(file).await {
+                    Ok(src_uri) => src_uri,
+                    Err(e) => return Err(e.into())
+                }
             }
-        }
+        };
 
-        // can't find file via SRC_URI either...
-        if src_manifest.is_none() {
-            return Err(format!(
-                "Could not find {} in Manifest of any configured repo",
-                &file
-            )
-            .into());
-        }
+        for uri in uris {
+            println!("Fetching {}", &uri);
 
-        // we found a match - yay
-        // let's parse all related ebuilds
-        let ebuilds = src_manifest
-            .unwrap()
-            .parent()
-            .unwrap()
-            .read_dir()
-            .map_err(|e| e.to_string())?
-            .filter_map(|x| match x {
-                Ok(x) => match x.path().extension() {
-                    Some(y) if y == "ebuild" => Some(x),
-                    Some(_) => None,
-                    None => None,
-                },
-                Err(_) => None,
-            });
-
-        let mut src_uri = None;
-        for ebuild in ebuilds {
-            println!("Checking {}", ebuild.path().to_string_lossy());
-            let parsed = Ebuild::parse(ebuild.path())
-                .await
-                .map_err(|e| e.to_string())?;
-
-            if let Some(url) = parsed.src_uri().get(file) {
-                src_uri = Some(url.to_owned());
-                break;
-            }
-        }
-
-        if src_uri.is_none() {
-            return Err(format!(
-                "Could not find {} in any ebuild belonging to Manifest",
-                &file
-            )
-            .into());
-        }
-
-        // try all urls
-        for url in src_uri.unwrap() {
-            println!("Fetching {}", &url);
-
-            let mut stream = match reqwest::get(url).await {
+            let mut stream = match reqwest::get(uri).await {
                 Err(e) => {
                     eprintln!("{}", e);
                     continue;

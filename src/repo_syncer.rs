@@ -2,12 +2,15 @@ use git2::Direction;
 use git2::Repository;
 use git2::ResetType;
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
+use futures::lock::Mutex;
 use tokio::fs;
 use tokio::time;
 
 use crate::config::Config;
 use crate::repo_db::RepoDB;
+use crate::manifest_walker::ManifestWalker;
+use crate::ebuild_parser::Ebuild;
 
 /// struct to clone and sync portage repos
 pub struct RepoSyncer {
@@ -16,6 +19,9 @@ pub struct RepoSyncer {
 
     /// path where the repos o sync are stored
     storage_root: PathBuf,
+
+    /// repo database
+    repo_db: Arc<Mutex<RepoDB>>,
 }
 
 impl RepoSyncer {
@@ -78,6 +84,7 @@ impl RepoSyncer {
         Ok(Self {
             sync_interval,
             storage_root,
+            repo_db,
         })
     }
 
@@ -89,8 +96,27 @@ impl RepoSyncer {
         loop {
             tokio::select! {
                 _ = interval.tick() => {
+                    println!("Starting repository operations");
+
+                    println!("Syncing repositories");
                     if let Err(e) = self.sync().await {
                         eprintln!("Sync failed: {}", e);
+                        continue;
+                    }
+
+                    println!("Parsing Manifest files for updates");
+                    let changed = match self.parse_manifests().await {
+                        Ok(val) => val,
+                        Err(e) => {
+                            eprintln!("Manifest parsing failed: {}", e);
+                            continue;
+                        }
+                    };
+
+                    println!("Parsing ebuilds with changed Manifest");
+                    if let Err(e) = self.parse_ebuilds(changed).await {
+                        eprintln!("Parsing ebuilds failed: {}", e);
+                        continue;
                     }
                 }
             }
@@ -207,5 +233,65 @@ impl RepoSyncer {
         } else {
             Err(format!("Failed repos: {}", failed.join(", ")))
         }
+    }
+
+    /// parse all manifests and update the database
+    /// returns Vec of paths with changed manifests
+    async fn parse_manifests(&self) -> Result<Vec<PathBuf>, String> {
+        let repos = self
+            .storage_root
+            .read_dir()
+            .map_err(|e| e.to_string())?
+            .filter_map(|x| match x {
+                Ok(x) if x.path().is_dir() => Some(x),
+                Ok(_) => None,
+                Err(_) => None,
+            });
+
+        // look through manifests
+        let mut changed = Vec::new();
+        for repo in repos {
+            println!("Parsing Manifest files in repo {}", repo.path().to_string_lossy());
+            let manifests = ManifestWalker::new(repo.path()).map_err(|e| e.to_string())?;
+            
+            match manifests.update_db(&self.repo_db).await {
+                Ok(changed_here) => changed.extend(changed_here),
+                Err(_) => continue,
+            }
+        }
+
+        Ok(changed)
+    }
+
+    async fn parse_ebuilds(&self, manifests: Vec<PathBuf>) -> Result<(), String> {
+        for manifest in manifests {
+            // parse all related ebuilds
+            let ebuilds = manifest
+                .parent()
+                .unwrap()
+                .read_dir()
+                .map_err(|e| e.to_string())?
+                .filter_map(|x| match x {
+                    Ok(x) => match x.path().extension() {
+                        Some(y) if y == "ebuild" => Some(x),
+                        Some(_) => None,
+                        None => None,
+                    },
+                    Err(_) => None,
+                });
+
+            let mut src_uri = None;
+            for ebuild in ebuilds {
+                println!("Checking {}", ebuild.path().to_string_lossy());
+                let parsed = Ebuild::parse(ebuild.path())
+                    .await
+                    .map_err(|e| e.to_string())?;
+
+                // add src_uris to database
+                self.repo_db.
+            }
+        }
+        
+        Ok(())
     }
 }

@@ -1,6 +1,7 @@
 use clap::Parser;
 use rocket::{Build, Rocket};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
+use futures::lock::Mutex;
 use tokio::task;
 
 // import vars from build.rs
@@ -45,7 +46,7 @@ async fn rocket() -> Rocket<Build> {
         std::process::exit(1);
     });
 
-    let repo_db = Arc::new(Mutex::new(match RepoDB::new(&config) {
+    let repo_db = match RepoDB::new(&config) {
         Ok(db) => db,
         Err(e) => {
             eprintln!("Failed to initialize database: {}", e);

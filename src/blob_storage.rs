@@ -9,6 +9,7 @@ use tokio::sync::Notify;
 use crate::config;
 use crate::fetcher::Fetcher;
 use crate::utils;
+use crate::repo_db::RepoDB;
 
 /// storage for downloaded blobs
 pub struct BlobStorage {
@@ -34,8 +35,8 @@ impl BlobStorage {
     /// create BlobStorage and setup fetcher for missing files
     /// @param config    Config struct
     /// @param location  root of the blob storage
-    pub async fn new(config: &config::Config) -> Result<Self, Box<dyn std::error::Error>> {
-        let fetcher = Fetcher::new(config).await?;
+    pub async fn new(config: &config::Config, repo_db: Arc<Mutex<RepoDB>>) -> Result<Self, Box<dyn std::error::Error>> {
+        let fetcher = Fetcher::new(config, repo_db.clone()).await?;
         let new = Self {
             location: config.storage.location.join("distfiles"),
             fetcher,

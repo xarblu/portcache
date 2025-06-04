@@ -15,7 +15,7 @@ type SrcUriObj = HashMap<String, Vec<String>>;
 /// parse an ebuild file
 pub struct Ebuild {
     /// object containing the SRC_URIs
-    src_uri: SrcUriObj,
+    pub src_uri: SrcUriObj,
 }
 
 impl Ebuild {
@@ -62,10 +62,5 @@ impl Ebuild {
         let src_uri: SrcUriObj = serde_json::from_str(&src_uri_json).map_err(|e| e.to_string())?;
 
         Ok(Self { src_uri })
-    }
-
-    /// get reference to src_uri
-    pub fn src_uri(&self) -> &SrcUriObj {
-        &self.src_uri
     }
 }
