@@ -5,6 +5,103 @@ use tokio::io;
 use tokio::io::AsyncBufReadExt;
 use walkdir::WalkDir;
 
+pub struct ManifestEntry {
+    /// origin Manifest file
+    origin: PathBuf,
+
+    /// file name
+    file: String,
+
+    /// file size in bytes
+    size: u32,
+
+    /// blake2b checksum
+    blake2b: Option<String>,
+
+    /// sha512 checksum
+    sha512: Option<String>,
+}
+
+impl ManifestEntry {
+    /// parse a manifest entry from a manifest line
+    pub fn parse(origin: PathBuf, line: &String) -> Result<ManifestEntry, String> {
+        let mut file: Option<String> = None;
+        let mut size: Option<u32> = None;
+        let mut blake2b: Option<String> = None;
+        let mut sha512: Option<String> = None;
+
+        let mut parts = line.split_whitespace();
+        while let Some(part) = parts.next() {
+            match part {
+                "DIST" => {
+                    file = match parts.next() {
+                        Some(s) => Some(s.to_string()),
+                        None => {
+                            return Err(format!(
+                                "Expected file name after \"DIST\" in line \"{}\"",
+                                &line
+                            ));
+                        }
+                    };
+                    size = match parts.next() {
+                        Some(s) => match s.parse() {
+                            Ok(i) => Some(i),
+                            Err(e) => return Err(e.to_string()),
+                        },
+                        None => {
+                            return Err(format!(
+                                "Expected file size after \"DIST {}\" in line \"{}\"",
+                                &file.unwrap(),
+                                &line
+                            ));
+                        }
+                    };
+                }
+                "BLAKE2B" => {
+                    blake2b = match parts.next() {
+                        Some(s) => Some(s.to_string()),
+                        None => {
+                            return Err(format!(
+                                "Expected blake2b checksum after \"BLAKE2B\" in line \"{}\"",
+                                &line
+                            ));
+                        }
+                    };
+                }
+                "SHA512" => {
+                    sha512 = match parts.next() {
+                        Some(s) => Some(s.to_string()),
+                        None => {
+                            return Err(format!(
+                                "Expected sha512 checksum after \"SHA512\" in line \"{}\"",
+                                &line
+                            ));
+                        }
+                    };
+                }
+                _ => (),
+            }
+        }
+
+        // file name and size are required, checksums are optional for now
+        if file.is_none() {
+            return Err(format!("Line {} doesn't contain file name", &line));
+        }
+
+        if size.is_none() {
+            return Err(format!("Line {} doesn't contain file size", &line));
+        }
+
+        Ok(ManifestEntry {
+            origin,
+            file: file.unwrap(),
+            size: size.unwrap(),
+            blake2b,
+            sha512,
+        })
+    }
+}
+
 /// walk through Manifest files in a ebuild tree
 pub struct ManifestWalker {
     /// ebuild tree root
