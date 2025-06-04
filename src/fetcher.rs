@@ -192,11 +192,10 @@ impl Fetcher {
         file: &String,
         store: &BlobStorage,
     ) -> Result<(), Box<dyn std::error::Error>> {
-
         // try all uris
         let uris = match self.repo_db.get_src_uri(file).await {
             Ok(x) => x,
-            Err(e) => return Err(e.into())
+            Err(e) => return Err(e.into()),
         };
         for uri in uris {
             println!("Fetching {}", &uri);

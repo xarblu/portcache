@@ -1,5 +1,5 @@
-use futures::pin_mut;
 use futures::StreamExt;
+use futures::pin_mut;
 use git2::Direction;
 use git2::Repository;
 use git2::ResetType;
@@ -9,9 +9,9 @@ use tokio::fs;
 use tokio::time;
 
 use crate::config::Config;
-use crate::repo_db::RepoDB;
-use crate::manifest_walker::ManifestWalker;
 use crate::ebuild_parser::Ebuild;
+use crate::manifest_walker::ManifestWalker;
+use crate::repo_db::RepoDB;
 
 /// struct to clone and sync portage repos
 pub struct RepoSyncer {
@@ -252,16 +252,19 @@ impl RepoSyncer {
         // look through manifests
         let mut new = Vec::new();
         for repo in repos {
-            println!("Parsing Manifest files in repo {}", repo.path().to_string_lossy());
+            println!(
+                "Parsing Manifest files in repo {}",
+                repo.path().to_string_lossy()
+            );
             let mut manifests = ManifestWalker::new(repo.path()).map_err(|e| e.to_string())?;
-            
+
             let entries = manifests.entries();
             pin_mut!(entries); // needed for iteration
             while let Some(entry) = entries.next().await {
                 let origin = entry.origin.clone();
                 match self.repo_db.insert_manifest_entry(entry).await {
                     Ok(_) => new.push(origin),
-                    Err(_) => ()
+                    Err(_) => (),
                 }
             }
         }
@@ -297,7 +300,7 @@ impl RepoSyncer {
                 panic!("Not Implemented!");
             }
         }
-        
+
         Ok(())
     }
 }

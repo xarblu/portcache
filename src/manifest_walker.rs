@@ -1,11 +1,11 @@
+use async_stream::stream;
+use futures_core::stream::Stream;
 use std::ffi::OsStr;
 use std::path::PathBuf;
 use tokio::fs;
 use tokio::io;
 use tokio::io::AsyncBufReadExt;
 use walkdir::WalkDir;
-use async_stream::stream;
-use futures_core::stream::Stream;
 
 pub struct ManifestEntry {
     /// origin Manifest file
@@ -149,7 +149,7 @@ impl ManifestWalker {
                     Ok(_) => continue,
                     Err(_) => continue,
                 };
-                
+
                 // create new line reader
                 let mut lines = match fs::File::open(&manifest).await {
                     Ok(x) => io::BufReader::new(x).lines(),
@@ -171,7 +171,7 @@ impl ManifestWalker {
                             Some(line) => line
                         }
                     };
-                    
+
                     let ret = match ManifestEntry::parse(&manifest, &line) {
                         Ok(entry) => entry,
                         Err(e) => {
