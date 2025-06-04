@@ -114,6 +114,10 @@ impl RepoSyncer {
                         }
                     };
 
+                    // FIXME: this only gets triggered if the file gets added to the manifest
+                    // if we didn't parse ebuilds the first time they won't be present in the DB
+                    // This should probably be rewritten to "check DB for files in Manifest table 
+                    // that don't have src_uri entries and parse those ebuilds"
                     println!("Parsing ebuilds with changed Manifest");
                     if let Err(e) = self.parse_ebuilds(changed).await {
                         eprintln!("Parsing ebuilds failed: {}", e);
@@ -264,10 +268,17 @@ impl RepoSyncer {
                 let origin = entry.origin.clone();
                 match self.repo_db.insert_manifest_entry(entry).await {
                     Ok(_) => new.push(origin),
-                    Err(_) => (),
+                    Err(_) => (), // already present (I think)
+                                  // TODO: relying on an error to check this
+                                  //       feels bad
                 }
             }
         }
+
+        // deduplicate vector
+        // dedup() should always work here since
+        // we don't ever go back to a Manifest we already parsed
+        new.dedup();
 
         Ok(new)
     }
@@ -296,8 +307,15 @@ impl RepoSyncer {
                     .map_err(|e| e.to_string())?;
 
                 // add src_uris to database
-                //self.repo_db.
-                panic!("Not Implemented!");
+                for (file, src_uris) in parsed.src_uri {
+                    for uri in src_uris {
+                        match self.repo_db.insert_src_uri(file.clone(), uri.clone()).await {
+                            Ok(_) => println!("Added {} to database", &file),
+                            Err(_) => (), // Same as above, usually means already present
+                                          // TODO: make this less hacky
+                        }
+                    }
+                }
             }
         }
 
