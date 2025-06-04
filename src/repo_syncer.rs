@@ -116,7 +116,7 @@ impl RepoSyncer {
 
                     // FIXME: this only gets triggered if the file gets added to the manifest
                     // if we didn't parse ebuilds the first time they won't be present in the DB
-                    // This should probably be rewritten to "check DB for files in Manifest table 
+                    // This should probably be rewritten to "check DB for files in Manifest table
                     // that don't have src_uri entries and parse those ebuilds"
                     println!("Parsing ebuilds with changed Manifest");
                     if let Err(e) = self.parse_ebuilds(changed).await {
