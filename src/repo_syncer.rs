@@ -1,9 +1,10 @@
+use futures::pin_mut;
+use futures::StreamExt;
 use git2::Direction;
 use git2::Repository;
 use git2::ResetType;
 use std::path::PathBuf;
 use std::sync::Arc;
-use futures::lock::Mutex;
 use tokio::fs;
 use tokio::time;
 
@@ -21,7 +22,7 @@ pub struct RepoSyncer {
     storage_root: PathBuf,
 
     /// repo database
-    repo_db: Arc<Mutex<RepoDB>>,
+    repo_db: Arc<RepoDB>,
 }
 
 impl RepoSyncer {
@@ -31,7 +32,7 @@ impl RepoSyncer {
     ///
     /// @param config  a reference to Config
     /// @returns Err   when repo_storage_root couldn't be created or isn't writable
-    pub async fn new(config: &Config, repo_db: Arc<Mutex<RepoDB>>) -> Result<Self, String> {
+    pub async fn new(config: &Config, repo_db: Arc<RepoDB>) -> Result<Self, String> {
         let sync_interval = time::Duration::from_secs(config.repo.sync_interval * 60);
         let storage_root = config.storage.location.join("repos");
         let repos = config.repo.repos.clone();
@@ -249,18 +250,23 @@ impl RepoSyncer {
             });
 
         // look through manifests
-        let mut changed = Vec::new();
+        let mut new = Vec::new();
         for repo in repos {
             println!("Parsing Manifest files in repo {}", repo.path().to_string_lossy());
-            let manifests = ManifestWalker::new(repo.path()).map_err(|e| e.to_string())?;
+            let mut manifests = ManifestWalker::new(repo.path()).map_err(|e| e.to_string())?;
             
-            match manifests.update_db(&self.repo_db).await {
-                Ok(changed_here) => changed.extend(changed_here),
-                Err(_) => continue,
+            let entries = manifests.entries();
+            pin_mut!(entries); // needed for iteration
+            while let Some(entry) = entries.next().await {
+                let origin = entry.origin.clone();
+                match self.repo_db.insert_manifest_entry(entry).await {
+                    Ok(_) => new.push(origin),
+                    Err(_) => ()
+                }
             }
         }
 
-        Ok(changed)
+        Ok(new)
     }
 
     async fn parse_ebuilds(&self, manifests: Vec<PathBuf>) -> Result<(), String> {
@@ -280,7 +286,6 @@ impl RepoSyncer {
                     Err(_) => None,
                 });
 
-            let mut src_uri = None;
             for ebuild in ebuilds {
                 println!("Checking {}", ebuild.path().to_string_lossy());
                 let parsed = Ebuild::parse(ebuild.path())
@@ -288,7 +293,7 @@ impl RepoSyncer {
                     .map_err(|e| e.to_string())?;
 
                 // add src_uris to database
-                self.repo_db.
+                //self.repo_db.
             }
         }
         

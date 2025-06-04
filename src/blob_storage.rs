@@ -35,7 +35,7 @@ impl BlobStorage {
     /// create BlobStorage and setup fetcher for missing files
     /// @param config    Config struct
     /// @param location  root of the blob storage
-    pub async fn new(config: &config::Config, repo_db: Arc<Mutex<RepoDB>>) -> Result<Self, Box<dyn std::error::Error>> {
+    pub async fn new(config: &config::Config, repo_db: Arc<RepoDB>) -> Result<Self, Box<dyn std::error::Error>> {
         let fetcher = Fetcher::new(config, repo_db.clone()).await?;
         let new = Self {
             location: config.storage.location.join("distfiles"),

@@ -1,17 +1,11 @@
 use std::ffi::OsStr;
 use std::path::PathBuf;
-use std::sync::Arc;
 use tokio::fs;
 use tokio::io;
 use tokio::io::AsyncBufReadExt;
 use walkdir::WalkDir;
-use std::task::{Context, Poll};
-use std::time::Duration;
-use std::pin::Pin;
 use async_stream::stream;
 use futures_core::stream::Stream;
-
-use crate::repo_db::RepoDB;
 
 pub struct ManifestEntry {
     /// origin Manifest file

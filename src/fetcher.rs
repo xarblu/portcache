@@ -1,7 +1,6 @@
 use futures::lock::Mutex;
 use futures::stream::StreamExt;
 use futures_core::stream::Stream;
-use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::{
     fs,
@@ -10,8 +9,6 @@ use tokio::{
 
 use crate::blob_storage::BlobStorage;
 use crate::config;
-use crate::ebuild_parser::Ebuild;
-use crate::manifest_walker::ManifestWalker;
 use crate::repo_db::RepoDB;
 use crate::utils;
 
@@ -34,12 +31,12 @@ pub struct Fetcher {
     next_mirror: Mutex<usize>,
 
     /// repo database
-    repo_db: Arc<Mutex<RepoDB>>,
+    repo_db: Arc<RepoDB>,
 }
 
 impl Fetcher {
     /// create a new Fetcher
-    pub async fn new(config: &config::Config, repo_db: Arc<Mutex<RepoDB>>) -> Result<Self, String> {
+    pub async fn new(config: &config::Config, repo_db: Arc<RepoDB>) -> Result<Self, String> {
         let mut mirrors: Vec<Mirror> = Vec::new();
 
         for url in config.fetcher.mirrors.clone() {
@@ -197,15 +194,10 @@ impl Fetcher {
     ) -> Result<(), Box<dyn std::error::Error>> {
 
         // try all uris
-        let uris = tokio::select! {
-            db = self.repo_db.lock() => {
-                match db.get_src_uri(file).await {
-                    Ok(src_uri) => src_uri,
-                    Err(e) => return Err(e.into())
-                }
-            }
+        let uris = match self.repo_db.get_src_uri(file).await {
+            Ok(x) => x,
+            Err(e) => return Err(e.into())
         };
-
         for uri in uris {
             println!("Fetching {}", &uri);
 
